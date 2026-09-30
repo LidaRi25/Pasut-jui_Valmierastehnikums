@@ -1,7 +1,10 @@
-import { Client, type QueryResult } from 'pg';
+import pg, { Client, type QueryResult } from 'pg';
 import { randomUUID } from 'node:crypto';
 import { inject } from 'vitest';
 import { TEMPLATE_DB } from './global-setup';
+
+// PostgREST atgriež date kā 'yyyy-mm-dd' tekstu — testos to atdarinām (pg pēc noklusējuma dod JS Date)
+pg.types.setTypeParser(1082, (v: string) => v);
 
 export type Role = 'teacher' | 'admin' | 'sysadmin';
 
@@ -101,7 +104,7 @@ export class TestDb {
     items: Array<{ product: string; unit?: string; quantity: string | null; notes?: string }>,
     opts: { id?: string; submit?: boolean } = {},
   ): Promise<string> {
-    const payloadItems = [];
+    const payloadItems: Array<{ product_id: string; unit_id: string; quantity: string | null; notes: string | null }> = [];
     for (const it of items) {
       const pid = await this.product(it.product);
       const uRow = await this.admin(

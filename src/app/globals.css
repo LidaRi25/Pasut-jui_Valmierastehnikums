@@ -1,0 +1,1288 @@
+/* ==========================================================================
+   Valmieras tehnikums — dizaina sistēma
+   Princips: MONOHROMS PAMATS (balts / melns / gaiši pelēks) + VT ZAĻAIS (#00AD6F) KĀ AKCENTS.
+   Zaļo izmanto galvenajām pogām, aktīvai izvēlnei, statusiem, ikonām, svarīgiem skaitļiem un fokusam.
+   Fonts: DM Sans (self-hosted, @fontsource), rezerves — Arial.
+   ========================================================================== */
+
+:root {
+  --white: #ffffff;
+  --black: #000000;
+  --green: #00ad6f; /* VT zaļš (Pantone 2251 C) */
+  --green-hover: #009a63;
+  --green-ink: #007a4d; /* tumšāks tonis tekstam uz balta (kontrasts 5,4:1) */
+  --green-tint: #e6f6ef;
+  --green-tint-2: #c9ebdc;
+
+  --bg: #f4f5f6;
+  --surface: #ffffff;
+  --line: #dcdfe3;
+  --line-strong: #b6bcc2;
+  --text: #000000;
+  --text-2: #3f4448;
+  --muted: #62686d;
+  --hover: #f2f4f5;
+
+  --danger: #b42318;
+  --danger-tint: #fdecea;
+  --warn: #8a5300;
+  --warn-tint: #fff4e0;
+
+  --radius: 6px;
+  --radius-lg: 10px;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 1px 1px rgb(0 0 0 / 0.04);
+  --sidebar-w: 248px;
+  --font: 'DM Sans Variable', 'DM Sans', Arial, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 0.5rem;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+h1 {
+  font-size: 1.6rem;
+}
+h2 {
+  font-size: 1.15rem;
+}
+h3 {
+  font-size: 1rem;
+}
+p {
+  margin: 0 0 0.75rem;
+}
+a {
+  color: var(--green-ink);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+a:hover {
+  color: var(--black);
+}
+hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 1rem 0;
+}
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 0.85rem;
+}
+.nowrap {
+  white-space: nowrap;
+}
+.right {
+  text-align: right;
+}
+.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.skip-link {
+  position: absolute;
+  left: -999px;
+  top: 0;
+  background: var(--black);
+  color: var(--white);
+  padding: 0.6rem 1rem;
+  z-index: 1000;
+}
+.skip-link:focus {
+  left: 0;
+}
+
+/* Fokusa stāvokļi (redzami tastatūras lietotājiem) */
+:focus-visible {
+  outline: 3px solid var(--green-ink);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* ---------- Pogas ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 38px;
+  padding: 0.45rem 0.95rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--white);
+  color: var(--black);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.92rem;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover {
+  background: var(--hover);
+  border-color: var(--black);
+  color: var(--black);
+}
+.btn:disabled,
+.btn[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--black);
+}
+.btn-primary:hover {
+  background: var(--green-hover);
+  border-color: var(--green-hover);
+  color: var(--black);
+}
+.btn-dark {
+  background: var(--black);
+  border-color: var(--black);
+  color: var(--white);
+}
+.btn-dark:hover {
+  background: #222;
+  color: var(--white);
+}
+.btn-danger {
+  color: var(--danger);
+  border-color: #e0b4af;
+}
+.btn-danger:hover {
+  background: var(--danger-tint);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+}
+.btn-sm {
+  min-height: 30px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.85rem;
+}
+.btn-icon {
+  min-width: 30px;
+  padding: 0.2rem;
+}
+.btn svg {
+  flex: none;
+}
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* ---------- Formas ---------- */
+label,
+.label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-2);
+  margin-bottom: 0.25rem;
+}
+.input,
+.select,
+.textarea {
+  width: 100%;
+  min-height: 38px;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--white);
+  color: var(--black);
+  font: inherit;
+}
+.textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+.input::placeholder {
+  color: #8a9096;
+}
+.input:hover,
+.select:hover,
+.textarea:hover {
+  border-color: var(--black);
+}
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: 3px solid var(--green-tint-2);
+  outline-offset: 0;
+  border-color: var(--green-ink);
+}
+.input[aria-invalid='true'],
+.select[aria-invalid='true'] {
+  border-color: var(--danger);
+  background: #fffafa;
+}
+.input-sm,
+.select-sm {
+  min-height: 32px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.9rem;
+}
+.field {
+  margin-bottom: 0.85rem;
+}
+.field-hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 0.2rem;
+}
+.field-error {
+  font-size: 0.82rem;
+  color: var(--danger);
+  margin-top: 0.2rem;
+}
+.form-grid {
+  display: grid;
+  gap: 0.85rem 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+.form-grid .span-2 {
+  grid-column: span 2;
+}
+.form-grid .span-all {
+  grid-column: 1 / -1;
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--text);
+  margin: 0;
+}
+.check input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--green-ink);
+}
+
+/* ---------- Kartes, virsraksti ---------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 1.1rem 1.25rem;
+  box-shadow: var(--shadow);
+  margin-bottom: 1rem;
+}
+.card.narrow {
+  max-width: 460px;
+  margin-inline: auto;
+}
+.card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.card-title h2,
+.card-title h3 {
+  margin: 0;
+}
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.page-head h1 {
+  margin: 0;
+}
+.page-head .sub {
+  color: var(--muted);
+  margin: 0.15rem 0 0;
+}
+.section-accent {
+  border-left: 4px solid var(--green);
+  padding-left: 0.7rem;
+}
+
+/* ---------- Paziņojumi ---------- */
+.alert {
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  background: var(--white);
+  margin-bottom: 0.9rem;
+  font-size: 0.93rem;
+}
+.alert-info {
+  border-left-color: var(--black);
+}
+.alert-success {
+  border-left-color: var(--green);
+  background: var(--green-tint);
+}
+.alert-warn {
+  border-left-color: #c77700;
+  background: var(--warn-tint);
+  color: #5c3800;
+}
+.alert-error {
+  border-left-color: var(--danger);
+  background: var(--danger-tint);
+  color: #7a1a12;
+}
+.alert ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.2rem;
+}
+
+/* ---------- Nozīmītes (statusi) ---------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.5;
+  border: 1px solid var(--line-strong);
+  background: var(--white);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.badge-green {
+  background: var(--green-tint);
+  border-color: var(--green-tint-2);
+  color: var(--green-ink);
+}
+.badge-dark {
+  background: var(--black);
+  border-color: var(--black);
+  color: var(--white);
+}
+.badge-muted {
+  background: var(--bg);
+  color: var(--muted);
+}
+.badge-warn {
+  background: var(--warn-tint);
+  border-color: #f1d3a0;
+  color: var(--warn);
+}
+.badge-neutral {
+  background: var(--white);
+  color: var(--black);
+  border-color: var(--black);
+}
+
+/* ---------- Lietotnes karkass ---------- */
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  min-height: 100vh;
+}
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--white);
+  border-right: 1px solid var(--line);
+  padding: 1rem 0.75rem;
+  overflow-y: auto;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.25rem 0.5rem 1rem;
+  color: var(--black);
+  text-decoration: none;
+}
+.brand-mark {
+  width: 10px;
+  align-self: stretch;
+  min-height: 34px;
+  background: var(--green);
+  border-radius: 2px;
+}
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+}
+.brand-text strong {
+  font-size: 0.98rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.brand-text span {
+  font-size: 0.74rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nav a {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--radius);
+  color: var(--black);
+  font-weight: 500;
+  text-decoration: none;
+  border-left: 3px solid transparent;
+}
+.nav a svg {
+  color: var(--muted);
+  flex: none;
+}
+.nav a:hover {
+  background: var(--hover);
+}
+.nav a[aria-current='page'] {
+  background: var(--green-tint);
+  border-left-color: var(--green);
+  font-weight: 700;
+}
+.nav a[aria-current='page'] svg {
+  color: var(--green-ink);
+}
+.nav-badge {
+  margin-left: auto;
+  background: var(--green);
+  color: var(--black);
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0 0.45rem;
+  min-width: 1.3rem;
+  text-align: center;
+}
+.sidebar-foot {
+  margin-top: auto;
+  padding: 0.85rem 0.5rem 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.85rem;
+}
+.sidebar-foot .who {
+  font-weight: 700;
+  word-break: break-word;
+}
+.sidebar-foot .role {
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+.main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.topbar {
+  display: none;
+}
+.content {
+  padding: 1.5rem clamp(1rem, 2.5vw, 2rem) 3rem;
+  max-width: 1400px;
+  width: 100%;
+}
+.nav-scrim {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.55rem 1rem;
+    background: var(--white);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar .brand {
+    padding: 0;
+  }
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(84vw, 300px);
+    z-index: 50;
+    transform: translateX(-102%);
+    transition: transform 0.18s ease;
+    box-shadow: 0 0 30px rgb(0 0 0 / 0.2);
+  }
+  .shell[data-nav-open='true'] .sidebar {
+    transform: none;
+  }
+  .shell[data-nav-open='true'] .nav-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgb(0 0 0 / 0.4);
+  }
+  .content {
+    padding-top: 1rem;
+  }
+  h1 {
+    font-size: 1.35rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none;
+  }
+}
+
+.center-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+
+/* ---------- Tabulas ---------- */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--white);
+  box-shadow: var(--shadow);
+}
+.table-wrap .table {
+  border-radius: inherit;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+.table th,
+.table td {
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+}
+.table th {
+  background: var(--white);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  border-bottom: 2px solid var(--black);
+  white-space: nowrap;
+}
+.table th.num,
+.table td.num {
+  text-align: right;
+}
+.table tbody tr:hover {
+  background: #fafbfb;
+}
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.table tr.row-warn td {
+  background: var(--warn-tint);
+}
+.table tr.row-error td {
+  background: var(--danger-tint);
+}
+.table tr.subrow > td {
+  background: var(--green-tint);
+  border-bottom: 1px solid var(--green-tint-2);
+}
+.table .total {
+  font-weight: 700;
+  color: var(--green-ink);
+  font-size: 1rem;
+}
+.table .actions {
+  white-space: nowrap;
+  text-align: right;
+}
+.table td.primary {
+  font-weight: 600;
+}
+.empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* Telefonā tabulas pārtop kartītēs */
+@media (max-width: 760px) {
+  .table-stack thead {
+    position: absolute;
+    left: -9999px;
+  }
+  .table-stack,
+  .table-stack tbody,
+  .table-stack tr,
+  .table-stack td {
+    display: block;
+    width: 100%;
+  }
+  .table-stack tr {
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--line-strong);
+  }
+  .table-stack tbody tr:last-child {
+    border-bottom: 0;
+  }
+  .table-stack td {
+    border: 0;
+    padding: 0.2rem 0;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    text-align: right;
+  }
+  .table-stack td::before {
+    content: attr(data-label);
+    font-size: 0.74rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+    text-align: left;
+    flex: none;
+    padding-top: 0.15rem;
+  }
+  .table-stack td.num,
+  .table-stack td.actions {
+    text-align: right;
+  }
+  .table-stack td.actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  .table-stack td.actions::before,
+  .table-stack td[data-label='']::before {
+    display: none;
+  }
+  .table-stack tr.subrow {
+    background: var(--green-tint);
+  }
+}
+
+/* ---------- Rīku josla / filtri ---------- */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: flex-end;
+  margin-bottom: 0.9rem;
+}
+.filters {
+  display: grid;
+  gap: 0.6rem 0.8rem;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  align-items: end;
+}
+.filters .field {
+  margin: 0;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+}
+
+/* ---------- KPI ---------- */
+.kpis {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  margin-bottom: 1rem;
+}
+.kpi {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--green);
+  border-radius: var(--radius-lg);
+  padding: 0.8rem 1rem;
+  box-shadow: var(--shadow);
+}
+.kpi .value {
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: var(--green-ink);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.kpi .label {
+  margin: 0.25rem 0 0;
+  color: var(--text-2);
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+.kpi a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.grid-2 {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+}
+.grid-2 > .card {
+  margin-bottom: 0;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.deadline {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.deadline strong {
+  font-size: 1.05rem;
+}
+
+details.inline > summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+  color: var(--green-ink);
+}
+details.inline > summary::-webkit-details-marker {
+  display: none;
+}
+details.inline[open] > summary {
+  margin-bottom: 0.6rem;
+}
+details.inline > .panel {
+  padding: 0.8rem;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+/* ---------- Pieteikuma veidlapa (atgādina VT ikdienas pieteikumu) ---------- */
+.form-sheet {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+.form-sheet .sheet-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--black);
+  padding-bottom: 0.6rem;
+  margin-bottom: 1rem;
+}
+.form-sheet .sheet-title .org {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 1.05rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.form-sheet .sheet-title .org::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 26px;
+  background: var(--green);
+  border-radius: 2px;
+}
+.list-heading {
+  margin: 1.1rem 0 0.6rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+/* Preču rindu redaktors */
+.items-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.items-table th {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: left;
+  padding: 0.4rem 0.4rem;
+  border-bottom: 2px solid var(--black);
+  color: var(--text-2);
+}
+.items-table td {
+  padding: 0.3rem 0.3rem;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+}
+.items-table .col-no {
+  width: 3rem;
+  text-align: center;
+  color: var(--muted);
+  padding-top: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.items-table .col-unit {
+  width: 7.5rem;
+}
+.items-table .col-qty {
+  width: 8.5rem;
+}
+.items-table .col-notes {
+  width: 22%;
+}
+.items-table .col-act {
+  width: 6.5rem;
+  white-space: nowrap;
+  text-align: right;
+}
+.items-table tr.row-warn td {
+  background: var(--warn-tint);
+}
+.items-table tr.row-error td {
+  background: var(--danger-tint);
+}
+.items-table tr.item-sub td {
+  border-bottom: 1px solid var(--line);
+  padding-top: 0;
+}
+.row-note {
+  font-size: 0.8rem;
+  margin-top: 0.15rem;
+}
+.row-note.warn {
+  color: var(--warn);
+}
+.row-note.error {
+  color: var(--danger);
+}
+.savebar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  margin: 1rem -0.25rem 0;
+  background: rgb(255 255 255 / 0.96);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 -4px 14px rgb(0 0 0 / 0.06);
+}
+.savebar .status {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.savebar .status.err {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .form-sheet {
+    padding: 0.9rem;
+  }
+  .items-table thead {
+    position: absolute;
+    left: -9999px;
+  }
+  .items-table,
+  .items-table tbody {
+    display: block;
+  }
+  .items-table tr.item-row {
+    display: grid;
+    grid-template-columns: 2.2rem 1fr 1fr;
+    gap: 0.35rem;
+    padding: 0.7rem 0;
+    border-bottom: 1px solid var(--line-strong);
+  }
+  .items-table tr.item-row td {
+    display: block;
+    border: 0;
+    padding: 0;
+    width: auto;
+  }
+  .items-table tr.item-row td.col-no {
+    grid-row: 1;
+    grid-column: 1;
+    padding-top: 0.6rem;
+  }
+  .items-table tr.item-row td.col-prod {
+    grid-row: 1;
+    grid-column: 2 / -1;
+  }
+  .items-table tr.item-row td.col-qty {
+    grid-row: 2;
+    grid-column: 2;
+    width: auto;
+  }
+  .items-table tr.item-row td.col-unit {
+    grid-row: 2;
+    grid-column: 3;
+    width: auto;
+  }
+  .items-table tr.item-row td.col-notes {
+    grid-row: 3;
+    grid-column: 2 / -1;
+    width: auto;
+  }
+  .items-table tr.item-row td.col-act {
+    grid-row: 4;
+    grid-column: 2 / -1;
+    text-align: left;
+    width: auto;
+  }
+  .items-table tr.item-sub {
+    display: block;
+  }
+  .items-table tr.item-sub td {
+    display: block;
+    border: 0;
+  }
+  .savebar .status {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+/* Preces izvēle (combobox) */
+.combo {
+  position: relative;
+}
+.combo-list {
+  position: absolute;
+  z-index: 40;
+  left: 0;
+  right: 0;
+  top: calc(100% + 2px);
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: var(--white);
+  border: 1px solid var(--black);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.16);
+  min-width: min(100%, 360px);
+}
+.combo-option {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: baseline;
+  padding: 0.45rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.combo-option[aria-selected='true'] {
+  background: var(--green-tint);
+  outline: 1px solid var(--green);
+}
+.combo-option .meta {
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.combo-option .alias {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.combo-option mark {
+  background: transparent;
+  color: var(--green-ink);
+  font-weight: 700;
+}
+.combo-option.propose {
+  border-top: 1px solid var(--line);
+  margin-top: 0.25rem;
+  color: var(--green-ink);
+  font-weight: 700;
+}
+.combo-empty {
+  padding: 0.5rem 0.6rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* ---------- Drukas skats (A4) ---------- */
+.print-page {
+  background: var(--bg);
+  min-height: 100vh;
+  padding: 1rem;
+}
+.print-toolbar {
+  max-width: 210mm;
+  margin: 0 auto 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.sheet {
+  width: 210mm;
+  max-width: 100%;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 16mm 15mm;
+  background: var(--white);
+  color: var(--black);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.12);
+}
+.sheet .sheet-org {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 15pt;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: 2px solid var(--black);
+  padding-bottom: 4mm;
+  margin-bottom: 5mm;
+}
+.sheet .sheet-org::before {
+  content: '';
+  width: 3mm;
+  height: 8mm;
+  background: var(--green);
+  display: inline-block;
+}
+.sheet .meta-grid {
+  display: grid;
+  grid-template-columns: 52mm 1fr;
+  border: 1px solid var(--black);
+  margin-bottom: 6mm;
+  font-size: 10.5pt;
+}
+.sheet .meta-grid > div {
+  padding: 2mm 3mm;
+  border-bottom: 1px solid var(--black);
+}
+.sheet .meta-grid > div:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+.sheet .meta-grid .k {
+  font-weight: 700;
+  border-right: 1px solid var(--black);
+  background: #f3f3f3;
+}
+.sheet h2.list-title {
+  text-align: center;
+  font-size: 11.5pt;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0 0 3mm;
+}
+.sheet table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10.5pt;
+}
+.sheet th,
+.sheet td {
+  border: 1px solid var(--black);
+  padding: 1.6mm 2.4mm;
+  text-align: left;
+  vertical-align: top;
+}
+.sheet th {
+  background: #eeeeee;
+  font-size: 9.5pt;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.sheet .c-no {
+  width: 12mm;
+  text-align: center;
+}
+.sheet .c-unit {
+  width: 22mm;
+}
+.sheet .c-qty {
+  width: 26mm;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.sheet .foot {
+  margin-top: 8mm;
+  font-size: 9pt;
+  color: #333;
+  display: flex;
+  justify-content: space-between;
+  gap: 8mm;
+}
+.sheet .sign {
+  margin-top: 14mm;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12mm;
+  font-size: 10pt;
+}
+.sheet .sign div {
+  border-top: 1px solid var(--black);
+  padding-top: 1.5mm;
+}
+
+@page {
+  size: A4;
+  margin: 0;
+}
+@media print {
+  body {
+    background: #fff;
+  }
+  .print-page {
+    background: #fff;
+    padding: 0;
+  }
+  .print-toolbar,
+  .skip-link {
+    display: none !important;
+  }
+  .sheet {
+    box-shadow: none;
+    width: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 15mm;
+  }
+  .sheet tr {
+    break-inside: avoid;
+  }
+  .sheet thead {
+    display: table-header-group;
+  }
+  /* Melnbaltai drukai: krāsu akcenti kļūst melni */
+  .sheet .sheet-org::before {
+    background: #000;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .sheet th,
+  .sheet .meta-grid .k {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* Pieteikuma skatījuma metadati */
+.meta-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.6rem 1.25rem;
+  margin: 0;
+}
+.meta-list dt {
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.meta-list dd {
+  margin: 0.1rem 0 0;
+  font-weight: 500;
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.9rem;
+}
+.timeline li {
+  padding: 0.35rem 0 0.35rem 0.9rem;
+  border-left: 2px solid var(--green);
+  margin-left: 0.3rem;
+}

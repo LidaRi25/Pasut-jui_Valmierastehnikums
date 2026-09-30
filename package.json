@@ -16,8 +16,11 @@
     "test:unit": "vitest run --exclude tests/db",
     "test:db": "vitest run tests/db",
     "db:local": "bash scripts/local-pg.sh",
-    "seed:demo": "node scripts/seed-demo.mjs",
-    "create-admin": "node scripts/create-first-admin.mjs"
+    "seed:demo": "node --env-file=.env.local scripts/seed-demo.mjs --yes",
+    "create-admin": "node --env-file=.env.local scripts/create-first-admin.mjs",
+    "e2e:stack": "node e2e/stack/stack.mjs up",
+    "e2e:prepare": "node e2e/stack/stack.mjs up && node --env-file=e2e/.tmp/env scripts/seed-demo.mjs --yes --password Demo-Parole-2026",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.2.0",

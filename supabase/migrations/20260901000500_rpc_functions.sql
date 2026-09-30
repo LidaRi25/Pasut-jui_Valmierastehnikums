@@ -420,11 +420,13 @@ begin
     and (p_product_id is null or i.product_id = p_product_id)
     and (p_category_id is null or p.category_id = p_category_id)
     and (p_topic is null or btrim(p_topic) = ''
-         or public.normalize_text(r.topic) like '%' || public.escape_like(public.normalize_text(p_topic)) || '%');
+         or public.normalize_text(r.topic) like '%' || public.escape_like(public.normalize_text(p_topic)) || '%')
+  order by r.lesson_date nulls last, t.full_name, r.request_no, i.position, i.id;
 end;
 $$;
 
 -- Apkopojums pa precēm: grupē pēc product_id UN mērvienības (dažādas mērvienības netiek summētas kopā).
+-- Visām atgrieztajām kopām ir deterministiska kārtība, lai tās varētu droši lapot (Supabase API max_rows = 1000).
 create or replace function public.get_order_summary(
   p_period_id uuid default null,
   p_date_from date default null,
@@ -471,7 +473,7 @@ as $$
                           p_product_id, p_category_id, p_statuses, p_topic) l
   group by l.product_id, l.product_name, l.category_id, l.category_name, l.category_sort, l.approval_status,
            l.product_active, l.unit_id, l.unit_code, l.order_unit_id, l.base_unit_id, l.package_quantity
-  order by l.category_sort nulls last, l.category_name nulls last, l.product_name, l.unit_code
+  order by l.category_sort nulls last, l.category_name nulls last, l.product_name, l.product_id, l.unit_code
 $$;
 
 -- Atskaites pa pedagogiem / grupām / kursiem / datumiem / kategorijām (kopsummas pa precēm katrā griezumā)
@@ -533,7 +535,7 @@ begin
   from l
   group by l.gk, l.gl, l.product_id, l.product_name, l.category_name, l.unit_id, l.unit_code
   order by min(case p_dimension when 'date' then coalesce(l.lesson_date::text, '9999') else lower(l.gl) end),
-           l.gk, l.product_name, l.unit_code;
+           l.gk, l.product_name, l.product_id, l.unit_code;
 end;
 $$;
 
