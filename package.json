@@ -1,0 +1,45 @@
+{
+  "name": "vt-pieteikumi",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Valmieras tehnikuma pārtikas produktu un materiālu pieteikumu / pasūtījumu pārvaldības sistēma",
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run --exclude tests/db",
+    "test:db": "vitest run tests/db",
+    "db:local": "bash scripts/local-pg.sh",
+    "seed:demo": "node scripts/seed-demo.mjs",
+    "create-admin": "node scripts/create-first-admin.mjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/dm-sans": "^5.2.0",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.117.2",
+    "exceljs": "^4.4.0",
+    "next": "^16.3.7",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "server-only": "^0.0.1",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.51.1",
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "eslint": "^9.39.0",
+    "eslint-config-next": "^16.3.7",
+    "pg": "^8.13.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
