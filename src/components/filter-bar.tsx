@@ -30,7 +30,8 @@ export function FilterBar({
 }) {
   const checked = new Set<RequestStatus>(filters.statuses ?? defaultStatuses ?? []);
   return (
-    <form method="get" action={action} className="card" aria-label="Filtri">
+    // key: pēc filtru maiņas (Back, sānjoslas saite, lapošana) kontroles tiek pārbūvētas ar jaunajām vērtībām
+    <form key={JSON.stringify(filters)} method="get" action={action} className="card" aria-label="Filtri">
       {Object.entries(hidden ?? {}).map(([k, v]) => (
         <input key={k} type="hidden" name={k} value={v} />
       ))}

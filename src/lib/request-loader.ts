@@ -39,21 +39,24 @@ export interface LoadedRequest {
 export async function loadRequest(id: string): Promise<LoadedRequest | null> {
   if (!UUID_RE.test(id)) return null;
   const supabase = await createClient();
-  const { data: req } = await supabase
+  const { data: req, error: reqError } = await supabase
     .from('requests')
     .select(
       'id, request_no, teacher_id, period_id, course_id, group_id, students, topic, lesson_date, student_count, notes, status, created_at, updated_at, submitted_at, profiles(full_name)',
     )
     .eq('id', id)
     .maybeSingle();
+  // Datubāzes kļūda nav «nav atrasts» un it īpaši nav «nav rindu» — citādi tukšs redaktors + saglabāšana izdzēstu rindas
+  if (reqError) throw new Error(`Pieteikumu neizdevās ielādēt (${reqError.code ?? 'kļūda'}).`);
   if (!req) return null;
-  const { data: rawItems } = await supabase
+  const { data: rawItems, error: itemsError } = await supabase
     .from('request_items')
     .select(
       'id, position, product_id, quantity, unit_id, notes, products(id, name, package_description, approval_status, is_active, order_unit_id, units!products_order_unit_id_fkey(id, code)), units(id, code, is_countable, warn_quantity)',
     )
     .eq('request_id', id)
     .order('position');
+  if (itemsError) throw new Error(`Pieteikuma rindas neizdevās ielādēt (${itemsError.code ?? 'kļūda'}).`);
   const raw = (rawItems ?? []) as unknown as RawItem[];
 
   const items: RequestItemRow[] = raw.map((r) => ({

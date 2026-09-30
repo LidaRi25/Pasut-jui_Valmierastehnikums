@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, useTransition } from 'react';
+import { GENERIC_ERROR } from '@/lib/errors';
 
 export interface FormState {
   ok?: boolean;
@@ -47,9 +48,15 @@ export function ActionForm({
         const form = e.currentTarget;
         const fd = new FormData(form, (e.nativeEvent as SubmitEvent).submitter);
         startTransition(async () => {
-          const result = await action(state, fd);
-          setState(result);
-          if (result.ok && resetOnSuccess) form.reset();
+          try {
+            const result = await action(state, fd);
+            setState(result);
+            if (result.ok && resetOnSuccess) form.reset();
+          } catch (err) {
+            // Tīkla/servera kļūda nedrīkst aizstāt lapu ar kļūdas ekrānu un zaudēt lietotāja ievadīto
+            console.error('[action-form]', err);
+            setState({ error: GENERIC_ERROR });
+          }
         });
       }}
     >
@@ -63,13 +70,16 @@ export function ActionForm({
           {state.message}
         </div>
       ) : null}
-      {children}
-      <div className="btn-row" style={{ marginTop: '0.5rem' }}>
-        <button type="submit" className={submitClassName} disabled={pending} aria-busy={pending} name={submitName} value={submitValue}>
-          {pending ? pendingLabel : submitLabel}
-        </button>
-        {footer}
-      </div>
+      {/* fieldset disabled: kamēr darbība notiek, visas kontroles (arī papildu pogas) ir bloķētas — nav dubultu izsaukumu */}
+      <fieldset disabled={pending} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+        {children}
+        <div className="btn-row" style={{ marginTop: '0.5rem' }}>
+          <button type="submit" className={submitClassName} aria-busy={pending} name={submitName} value={submitValue}>
+            {pending ? pendingLabel : submitLabel}
+          </button>
+          {footer}
+        </div>
+      </fieldset>
     </form>
   );
 }

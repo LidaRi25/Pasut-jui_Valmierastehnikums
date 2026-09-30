@@ -34,15 +34,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
 async function TeacherHome({ userId }: { userId: string }) {
   const supabase = await createClient();
-  const ref = await getReference();
+  const [ref, { data, error }, { count: drafts, error: draftsError }] = await Promise.all([
+    getReference(),
+    supabase.from('requests').select('id, request_no, topic, lesson_date, status, updated_at').eq('teacher_id', userId).order('updated_at', { ascending: false }).limit(6),
+    supabase.from('requests').select('id', { count: 'exact', head: true }).eq('teacher_id', userId).eq('status', 'draft'),
+  ]);
+  if (error || draftsError) throw new Error('Sākumlapas datus neizdevās ielādēt.');
   const open = openPeriods(ref.periods);
-  const { data } = await supabase
-    .from('requests')
-    .select('id, request_no, topic, lesson_date, status, updated_at')
-    .eq('teacher_id', userId)
-    .order('updated_at', { ascending: false })
-    .limit(6);
-  const { count: drafts } = await supabase.from('requests').select('id', { count: 'exact', head: true }).eq('teacher_id', userId).eq('status', 'draft');
   const rows = (data ?? []) as unknown as RecentRow[];
   return (
     <>
@@ -135,10 +133,8 @@ async function AdminHome() {
   const supabase = await createClient();
   const ref = await getReference();
   const period = pickActivePeriod(ref.periods);
-  const stats = period
-    ? (((await supabase.rpc('dashboard_stats', { p_period_id: period.id })).data ?? {}) as Record<string, number>)
-    : ({} as Record<string, number>);
-  const [{ data: recent }, { data: proposals }] = await Promise.all([
+  const [statsRes, { data: recent, error: recentError }, { data: proposals, error: proposalsError }] = await Promise.all([
+    period ? supabase.rpc('dashboard_stats', { p_period_id: period.id }) : Promise.resolve({ data: {}, error: null }),
     supabase
       .from('requests')
       .select('id, request_no, topic, lesson_date, status, updated_at, profiles(full_name)')
@@ -147,11 +143,14 @@ async function AdminHome() {
       .limit(8),
     supabase
       .from('product_proposals')
-      .select('id, proposed_name, created_at, profiles!product_proposals_proposed_by_fkey(full_name), products(request_items(count))')
+      .select('id, proposed_name, created_at, profiles!product_proposals_proposed_by_fkey(full_name)')
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
       .limit(6),
   ]);
+  // Kļūda nedrīkst izskatīties kā «viss nulle» — rādām kļūdas lapu
+  if (statsRes.error || recentError || proposalsError) throw new Error('Sākumlapas datus neizdevās ielādēt.');
+  const stats = (statsRes.data ?? {}) as Record<string, number>;
   const upcoming = openPeriods(ref.periods).slice(0, 3);
   const kpi = (value: number | undefined, label: string, href?: string) => (
     <div className="kpi">

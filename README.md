@@ -188,6 +188,7 @@ Seed satur arī paraugu grupas («1. grupa» … «6. grupa») un kursus — nom
 ```bash
 npm run create-admin -- --email vards.uzvards@valmierastehnikums.lv --name "Vārds Uzvārds"
 # (ģenerē pagaidu paroli un izdrukā to; var norādīt arī --password "...")
+# Ja konts ar šo e-pastu jau eksistē, skripts to NEPAAUGSTINA kluši — lai to darītu, pievienojiet --promote.
 ```
 
 Skripts izmanto `.env.local` (`SUPABASE_SERVICE_ROLE_KEY`). Alternatīva bez skripta: Supabase → *Authentication → Users → Add user*
@@ -291,7 +292,7 @@ Testi aptver: (1) summēšana no vairākiem pieteikumiem; (2) dažādi `product_
 datus; (5) administrators redz visus; (6) Excel eksports satur pareizās kopsummas; (7) kopēšana nemaina veco pieteikumu; (8) neaktīvu
 produktu nevar izvēlēties; (9) alias meklēšana; (10) perioda filtrs — un vēl RLS, audita nemaināmību, termiņu, iesniegšanas
 validāciju, apvienošanu, importu, veiktspēju (10 000 produktu, 150 rindu pieteikums), pieejamību (axe-core), mobilo skatu.
-Kopā: 105 vienības/DB testi + 41 e2e testi (39 darbvirsmas + 2 mobilie).
+Kopā: 109 vienības/DB testi (55 vienību + 54 DB) + 41 e2e testi (39 darbvirsmas + 2 mobilie).
 
 ## 13. Drošība
 

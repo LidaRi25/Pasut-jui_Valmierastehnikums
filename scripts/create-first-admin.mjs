@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Izveido pirmo sistēmas administratoru.
-//   node --env-file=.env.local scripts/create-first-admin.mjs --email vards@valmierastehnikums.lv --name "Vārds Uzvārds" [--password "..."]
+//   node --env-file=.env.local scripts/create-first-admin.mjs --email vards@valmierastehnikums.lv --name "Vārds Uzvārds" [--password "..."] [--promote]
+// --promote nepieciešams tikai tad, ja konts jau eksistē un to vēlaties paaugstināt par sistēmas administratoru.
 // Ja parole nav norādīta, tiek ģenerēta un izdrukāta (nomainiet to pēc pirmās pieteikšanās sadaļā "Profils").
 import { arg, ensureUser, randomPassword, serviceClient, setRole } from './lib.mjs';
 
@@ -18,6 +19,10 @@ if (password.length < 8) {
 
 const sb = serviceClient();
 const user = await ensureUser(sb, { email, fullName: name, password });
+if (!user.created && !process.argv.includes('--promote')) {
+  console.error(`Lietotājs ${email} jau eksistē. Lai to paaugstinātu par sistēmas administratoru, palaidiet vēlreiz ar --promote.`);
+  process.exit(1);
+}
 await setRole(sb, user.id, 'sysadmin');
 console.log(user.created ? `Lietotājs ${email} izveidots.` : `Lietotājs ${email} jau eksistēja.`);
 console.log('Loma: Sistēmas administrators.');

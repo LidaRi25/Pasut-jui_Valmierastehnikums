@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { BULK_FORM_ID, BulkStatusForm, SelectAllCheckbox } from '@/components/bulk-status-form';
 import { FilterBar } from '@/components/filter-bar';
 import { Icon } from '@/components/icons';
@@ -62,7 +63,11 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
   if (filters.product) q = q.eq('pf.product_id', filters.product);
   if (filters.category) q = q.eq('pf.products.category_id', filters.category);
   const from = (page - 1) * PAGE_SIZE;
-  const { data, count } = await q.order('updated_at', { ascending: false }).range(from, from + PAGE_SIZE - 1);
+  // id kā papildu atslēga: updated_at nav unikāls (masveida statusa maiņa dod vienādu laiku), citādi lapu robežas nav stabilas
+  const { data, count, error } = await q.order('updated_at', { ascending: false }).order('id').range(from, from + PAGE_SIZE - 1);
+  // Lapa ārpus diapazona (piem., pēc pēdējā ieraksta dzēšanas) — atgriežamies pirmajā lapā; citas kļūdas nerādām kā «nav pieteikumu»
+  if (error?.code === 'PGRST103' && page > 1) redirect(`/pieteikumi${toQueryString(filters)}`);
+  if (error) throw new Error(`Pieteikumu sarakstu neizdevās ielādēt (${error.code ?? 'kļūda'}).`);
   const rows = (data ?? []) as unknown as Row[];
   // "Pedagogs" kolonna: administratoram vienmēr; pedagogam — ja sarakstā ir arī citu pedagogu (piešķirtā piekļuve) pieteikumi
   const showTeacher = admin || rows.some((r) => r.teacher_id !== user.id);
@@ -189,7 +194,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
       {admin ? (
         <FilterBar action="/pieteikumi" filters={filters} reference={reference} teachers={teachers} productName={productName} />
       ) : (
-        <form method="get" className="toolbar" aria-label="Filtri">
+        <form method="get" className="toolbar" aria-label="Filtri" key={toQueryString(filters)}>
           <div className="field" style={{ marginBottom: 0 }}>
             <label htmlFor="flt-status">Statuss</label>
             <select id="flt-status" name="status" className="select select-sm" defaultValue={filters.statuses?.[0] ?? ''}>

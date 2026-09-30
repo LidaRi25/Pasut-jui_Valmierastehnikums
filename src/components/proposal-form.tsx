@@ -29,7 +29,7 @@ export function ProposalForm({
       submitValue="approve"
       pendingLabel="Apstrādā…"
       footer={
-        <button type="submit" name="intent" value="reject" className="btn btn-danger">
+        <button type="submit" name="intent" value="reject" className="btn btn-danger" formNoValidate>
           Noraidīt
         </button>
       }
@@ -74,7 +74,7 @@ export function ProposalForm({
         <summary>Pievienot kā sinonīmu esošai precei (apvienot)</summary>
         <div className="panel">
           <ProductField name="target" label="Esošā prece katalogā" placeholder="Meklēt preci, kurai šis ir sinonīms…" />
-          <button type="submit" name="intent" value="merge" className="btn btn-sm">
+          <button type="submit" name="intent" value="merge" className="btn btn-sm" formNoValidate>
             Pievienot kā sinonīmu un apvienot
           </button>
           <p className="field-hint">Pieteikumu rindas ar šo preci tiks pārceltas uz izvēlēto preci, nosaukums kļūs par sinonīmu.</p>

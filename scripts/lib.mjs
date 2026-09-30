@@ -24,9 +24,14 @@ export function arg(name) {
 
 /** Atrod vai izveido lietotāju; atgriež { id, created, password? } */
 export async function ensureUser(sb, { email, fullName, password }) {
-  const { data: list, error: listError } = await sb.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (listError) throw listError;
-  const existing = list.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+  // Meklējam visās lapās (nevis tikai pirmajos 1000 lietotājos)
+  let existing;
+  for (let page = 1; !existing; page++) {
+    const { data: list, error: listError } = await sb.auth.admin.listUsers({ page, perPage: 1000 });
+    if (listError) throw listError;
+    existing = list.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    if (list.users.length < 1000) break;
+  }
   if (existing) return { id: existing.id, created: false };
   const { data, error } = await sb.auth.admin.createUser({
     email,

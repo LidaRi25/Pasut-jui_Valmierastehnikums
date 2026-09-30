@@ -19,6 +19,8 @@ export const getReference = cache(async () => {
       .order('start_date', { ascending: false })
       .limit(120),
   ]);
+  const failed = [units, categories, courses, groups, periods].find((r) => r.error);
+  if (failed?.error) throw new Error(`Atsauces datus neizdevās ielādēt (${failed.error.code ?? 'kļūda'}).`);
   return {
     units: ((units.data ?? []) as Array<Unit & { warn_quantity: string | number | null }>).map((u) => ({ ...u, warn_quantity: numStr(u.warn_quantity) })) as Unit[],
     categories: (categories.data ?? []) as Category[],

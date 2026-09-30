@@ -39,6 +39,7 @@ export default async function RequestPage({
     supabase.rpc('can_edit_request', { p_request_id: id }),
   ]);
   const admin = isAdminRole(user.role);
+  if (canEditRes.error) throw new Error(`Tiesību pārbaude neizdevās (${canEditRes.error.code ?? 'kļūda'}).`);
   const canEdit = canEditRes.data === true;
   const period = ref.periods.find((p) => p.id === request.period_id) ?? null;
   const copied = sp.copied !== undefined ? Number(sp.copied) : null;
@@ -88,8 +89,10 @@ export default async function RequestPage({
     );
   }
 
-  const lockedReason =
-    request.status === 'submitted' && period && new Date(period.submission_deadline) <= new Date()
+  const viewOnly = !admin && request.teacher_id !== user.id;
+  const lockedReason = viewOnly
+    ? 'Jums ir tikai skatīšanās tiesības uz šo pieteikumu (piekļuvi piešķīris administrators).'
+    : request.status === 'submitted' && period && new Date(period.submission_deadline) <= new Date()
       ? `Iesniegšanas termiņš (${formatDateTime(period.submission_deadline)}) ir beidzies — pieteikumu vairs nevar labot. Lai veiktu izmaiņas, sazinieties ar pasūtītāju.`
       : request.status === 'submitted' && period && period.status !== 'open'
         ? 'Pasūtījuma periods vairs nav atvērts — pieteikumu nevar labot.'
@@ -124,7 +127,7 @@ export default async function RequestPage({
             <Link className="btn btn-ghost" href="/pieteikumi">
               ← Uz sarakstu
             </Link>
-            {request.status === 'draft' || admin ? (
+            {admin || (request.status === 'draft' && request.teacher_id === user.id) ? (
               <ConfirmAction action={deleteRequestAction} label="Dzēst pieteikumu" hidden={{ id: request.id }} question="Dzēst pieteikumu?" />
             ) : null}
           </>
