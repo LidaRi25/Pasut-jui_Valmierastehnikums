@@ -163,6 +163,13 @@ export function ProductCombobox({
   };
 
   const showList = open && !selected && query.trim().length >= 2;
+  const statusText = failed
+    ? 'Meklēšana īslaicīgi nav pieejama. Mēģiniet vēlreiz.'
+    : loading && hits.length === 0
+      ? 'Meklē…'
+      : hits.length === 0
+        ? 'Katalogā nekas netika atrasts.'
+        : null;
 
   return (
     <div className="combo">
@@ -172,8 +179,8 @@ export function ProductCombobox({
         type="text"
         className="input"
         role="combobox"
-        aria-expanded={showList}
-        aria-controls={listId}
+        aria-expanded={showList && optionCount > 0}
+        aria-controls={showList && optionCount > 0 ? listId : undefined}
         aria-autocomplete="list"
         aria-activedescendant={showList && optionCount > 0 ? `${listId}-${active}` : undefined}
         aria-label={ariaLabel}
@@ -204,11 +211,19 @@ export function ProductCombobox({
         }}
         onKeyDown={onKeyDown}
       />
-      {showList ? (
+      {showList && optionCount === 0 ? (
+        // Nav neviena ieteikuma — paziņojums ārpus listbox (listbox bez option ir nederīgs ARIA)
+        <div className="combo-list" role="status">
+          <div className="combo-empty">{statusText}</div>
+        </div>
+      ) : null}
+      {showList && optionCount > 0 ? (
         <ul className="combo-list" id={listId} role="listbox" aria-label="Preču ieteikumi">
-          {loading && hits.length === 0 ? <li className="combo-empty">Meklē…</li> : null}
-          {failed ? <li className="combo-empty">Meklēšana īslaicīgi nav pieejama. Mēģiniet vēlreiz.</li> : null}
-          {!loading && !failed && hits.length === 0 ? <li className="combo-empty">Katalogā nekas netika atrasts.</li> : null}
+          {statusText ? (
+            <li role="presentation" className="combo-empty">
+              {statusText}
+            </li>
+          ) : null}
           {hits.map((h, i) => (
             <li
               key={h.id}

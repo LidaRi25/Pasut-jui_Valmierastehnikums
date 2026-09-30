@@ -116,13 +116,15 @@ export async function moveAliasAction(_prev: FormState, formData: FormData): Pro
   const admin = await actionAdmin();
   if (!admin) return NO_PERMISSION;
   const id = String(formData.get('id') ?? '');
+  const from = String(formData.get('product_id') ?? '');
   const target = String(formData.get('target') ?? '');
   if (!UUID_RE.test(id) || !UUID_RE.test(target)) return { error: 'Izvēlieties preci, uz kuru pāradresēt sinonīmu.' };
   const supabase = await createClient();
   const { error } = await supabase.from('product_aliases').update({ product_id: target }).eq('id', id);
   if (error) return fail(error);
   revalidatePath('/katalogs', 'layout');
-  return { ok: true, message: 'Sinonīms pāradresēts.' };
+  // Sinonīms pazūd no šīs preces saraksta, tāpēc apstiprinājumu rādām pēc novirzīšanas
+  redirect(UUID_RE.test(from) ? `/katalogs/${from}?ok=saved` : '/katalogs?ok=saved');
 }
 
 /** Kļūdaini izveidota produkta apvienošana ar pareizo */

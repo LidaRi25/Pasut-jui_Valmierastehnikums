@@ -18,10 +18,11 @@ export function AddAliasForm({ action, productId }: { action: Action; productId:
   );
 }
 
-export function MoveAliasForm({ action, aliasId }: { action: Action; aliasId: string }) {
+export function MoveAliasForm({ action, aliasId, productId }: { action: Action; aliasId: string; productId: string }) {
   return (
     <ActionForm action={action} submitLabel="Pāradresēt" submitClassName="btn btn-sm">
       <input type="hidden" name="id" value={aliasId} />
+      <input type="hidden" name="product_id" value={productId} />
       <ProductField name="target" label="Pāradresēt uz preci" placeholder="Meklēt preci, uz kuru pāradresēt…" required />
     </ActionForm>
   );

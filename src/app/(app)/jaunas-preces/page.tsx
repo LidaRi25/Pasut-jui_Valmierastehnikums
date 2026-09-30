@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ProposalForm } from '@/components/proposal-form';
-import { Empty, PageHeader } from '@/components/ui';
+import { Alert, Empty, PageHeader } from '@/components/ui';
 import { requireAdmin } from '@/lib/auth';
 import { getReference } from '@/lib/data';
 import { formatDateTime, formatRequestNo } from '@/lib/format';
@@ -28,8 +28,15 @@ interface Proposal {
 
 const STATUS_LABEL: Record<string, string> = { approved: 'Apstiprināta', merged: 'Apvienota (sinonīms)', rejected: 'Noraidīta', pending: 'Gaida' };
 
-export default async function NewProductsPage() {
+const DONE_MESSAGE: Record<string, string> = {
+  approve: 'Prece apstiprināta un pievienota katalogam.',
+  merge: 'Prece pievienota kā sinonīms esošai precei; pieteikumu rindas pārceltas uz pareizo preci.',
+  reject: 'Ierosinājums noraidīts.',
+};
+
+export default async function NewProductsPage({ searchParams }: { searchParams: Promise<{ done?: string }> }) {
   await requireAdmin();
+  const { done } = await searchParams;
   const supabase = await createClient();
   const ref = await getReference();
   const select =
@@ -58,6 +65,7 @@ export default async function NewProductsPage() {
   return (
     <>
       <PageHeader title="Jaunās / neapstiprinātās preces" sub="Pedagogu ierosinātās preces, kas vēl nav apstiprinātas katalogā." />
+      {done && DONE_MESSAGE[done] ? <Alert tone="success">{DONE_MESSAGE[done]}</Alert> : null}
       {pend.length === 0 ? (
         <div className="card">
           <Empty>Nav jaunu preču, kas gaida apstiprinājumu.</Empty>

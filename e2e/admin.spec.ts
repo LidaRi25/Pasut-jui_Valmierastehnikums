@@ -265,6 +265,56 @@ test.describe('Trīs pedagogi, viens periods: apkopošana un Excel', () => {
   });
 });
 
+test.describe('Masveida darbības un liels pieteikums', () => {
+  test('masveida statusa maiņa pieteikumu sarakstā', async ({ page }) => {
+    await login(page, USERS.admin.email);
+    await page.goto(`/pieteikumi?period=${period.id}`);
+    const rows = page.getByRole('row').filter({ hasText: `Apkopojums ${stamp}` });
+    await expect(rows).toHaveCount(3);
+    await rows.nth(0).getByRole('checkbox').check();
+    await rows.nth(1).getByRole('checkbox').check();
+    await page.locator('#bulk-status').selectOption({ label: 'Apstiprināts' });
+    await page.getByRole('button', { name: 'Mainīt statusu' }).click();
+    await expect(page.getByText('Statuss nomainīts 2 pieteikumiem')).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole('row').filter({ hasText: `Apkopojums ${stamp}` }).filter({ hasText: 'Apstiprināts' })).toHaveCount(2);
+    await expect(page.getByRole('row').filter({ hasText: `Apkopojums ${stamp}` }).filter({ hasText: 'Pasūtīts' })).toHaveCount(1);
+  });
+
+  test('liels pieteikums: 150 rindas ielādējas un ir labojamas (veiktspēja)', async ({ browser }) => {
+    const sb = service();
+    const teacher = await sb.from('profiles').select('id').eq('email', USERS.ilze.email).single();
+    const p = await createPeriod(`E2E liels ${stamp}`);
+    const { data: prods } = await sb.from('products').select('id, order_unit_id').eq('is_active', true).eq('approval_status', 'approved').order('name').limit(55);
+    const req = await sb.from('requests').insert({ teacher_id: teacher.data!.id, period_id: p.id, topic: `Liels pieteikums ${stamp}`, lesson_date: p.date, status: 'draft' }).select('id').single();
+    const items = Array.from({ length: 150 }, (_, i) => ({ request_id: req.data!.id, position: i + 1, product_id: prods![i % prods!.length].id, unit_id: prods![i % prods!.length].order_unit_id, quantity: String(i + 1) }));
+    const ins = await sb.from('request_items').insert(items);
+    expect(ins.error).toBeNull();
+    await asUser(browser, USERS.ilze.email, async (page) => {
+      const t0 = Date.now();
+      await page.goto(`/pieteikumi/${req.data!.id}`);
+      await expect(page.getByTestId('item-row')).toHaveCount(150);
+      const loadMs = Date.now() - t0;
+      expect(loadMs).toBeLessThan(6000);
+      // rakstīšana pēdējā rindā paliek ātra
+      const last = page.getByTestId('item-row').nth(149).getByLabel(/^Daudzums/);
+      const t1 = Date.now();
+      await last.fill('7,25');
+      await last.press('Enter');
+      expect(Date.now() - t1).toBeLessThan(3000);
+      await page.getByTestId('save-draft').click();
+      await expect(page.getByTestId('save-status')).toContainText('saglabāts');
+      await page.reload();
+      await expect(page.getByTestId('item-row')).toHaveCount(150);
+      await expect(page.getByTestId('item-row').nth(149).getByLabel(/^Daudzums/)).toHaveValue('7,25');
+      // "Pievienot rindu" pievieno tikai vienu rindu (nevis iepriekš ģenerētas tukšas rindas)
+      await page.getByRole('button', { name: 'Pievienot rindu' }).click();
+      await expect(page.getByTestId('item-row')).toHaveCount(151);
+      console.info(`[veiktspēja] pieteikums ar 150 rindām ielādēts ${loadMs} ms`);
+    });
+  });
+});
+
 test.describe('Katalogs, jaunās preces, periodi, lietotāji', () => {
   test('jaunas preces plūsma: pedagogs ierosina → administrators pārdēvē un apstiprina → visi to atrod', async ({ browser }) => {
     const name = `E2E rīsu kūka ${stamp}`;
@@ -289,6 +339,7 @@ test.describe('Katalogs, jaunās preces, periodi, lietotāji', () => {
       await card.locator('input[name="name"]').fill(`${name} (pārdēvēta)`);
       await card.locator('select[name="category_id"]').selectOption({ label: 'Sausās preces' });
       await card.getByRole('button', { name: 'Apstiprināt' }).click();
+      await expect(page).toHaveURL(/done=approve/);
       await expect(page.locator('.alert-success').first()).toContainText('Prece apstiprināta');
     });
     await asUser(browser, USERS.ilze.email, async (page) => {
@@ -325,6 +376,7 @@ test.describe('Katalogs, jaunās preces, periodi, lietotāji', () => {
       await card.getByRole('combobox', { name: /^Esošā prece/ }).fill('mozzarella');
       await page.getByRole('listbox').getByRole('option', { name: /Siers Mozzarella/ }).first().click();
       await card.getByRole('button', { name: 'Pievienot kā sinonīmu un apvienot' }).click();
+      await expect(page).toHaveURL(/done=merge/);
       await expect(page.locator('.alert-success').first()).toContainText('sinonīms');
       // pieteikuma rinda tagad rāda pareizo preci
       await page.goto(`/pieteikumi/${requestId}`);
@@ -392,6 +444,25 @@ test.describe('Katalogs, jaunās preces, periodi, lietotāji', () => {
       await expect(page.getByRole('row').filter({ hasText: 'Sviests 1×0,25 kg' })).toHaveCount(1);
       await expect(page.getByRole('row').filter({ hasText: 'Sviests 1×0,2 kg' })).toHaveCount(1);
       await expect(page.getByRole('row').filter({ hasText: 'Sviests 1×0,5 kg' })).toHaveCount(1);
+    });
+  });
+
+  test('sinonīma pāradresēšana uz citu preci', async ({ browser }) => {
+    const alias = `Krūtiņa ${stamp}`;
+    await asUser(browser, USERS.admin.email, async (page) => {
+      await page.goto('/katalogs?q=vistas fileja');
+      await page.getByRole('link', { name: 'Vistas fileja', exact: true }).click();
+      await page.locator('#alias-new').fill(alias);
+      await page.getByRole('button', { name: 'Pievienot sinonīmu' }).click();
+      await expect(page.locator('.alert-success')).toContainText('Sinonīms pievienots');
+      await page.getByText('Pāradresēt uz citu preci').first().click();
+      await page.getByRole('combobox', { name: /^Pāradresēt uz preci/ }).fill('titara');
+      await page.getByRole('listbox').getByRole('option', { name: /^Tītara fileja/ }).click();
+      await page.getByRole('button', { name: 'Pāradresēt', exact: true }).click();
+      await expect(page).toHaveURL(/ok=saved/);
+      await expect(page.locator('.alert-success', { hasText: 'Izmaiņas saglabātas' })).toBeVisible();
+      const r = await page.request.get(`/api/products/search?q=${encodeURIComponent(alias)}`);
+      expect(((await r.json()) as { items: Array<{ name: string }> }).items[0].name).toBe('Tītara fileja');
     });
   });
 

@@ -158,6 +158,26 @@ describe.skipIf(!dbAvailable())('Produktu katalogs, sinonīmi, ierosinājumi (DB
     expect(res.rows[0].r).toEqual({ inserted: 2, skipped: 5 }); // 'Sviests 1×0,25 kg' un 'Pilnīgi jauna prece'; 'Mocarella' ir alias, nevis nosaukums -> tiktu izveidots
   });
 
+  it('27) seed satur visas specifikācijā minētās preces, kategorijas un mērvienības', async () => {
+    const spec = ['Bietes', 'Bietes tvaicētas', 'Brokolini', 'Brokoļi', 'Burkāni', 'Citroni', 'Dilles svaigas', 'Kabači', 'Kartupeļi', 'Ķiploki', 'Ķirbis', 'Laimi', 'Lociņi',
+      'Mango nogatavināti', 'Paprika sarkanā svaiga', 'Pastinaks', 'Pētersīļi lapu', 'Piparmētras svaigas', 'Saldais kartupelis', 'Selerijas sakne', 'Sīpoli', 'Sīpoli sarkanie',
+      'Sīpoli šalotes', 'Spināti svaigi', 'Šampinjoni svaigi', 'Tomāti svaigi', 'Cūkgaļa maltā', 'Tītara fileja', 'Vistas fileja', 'Olas', 'Piens 2,5% 1×1 L', 'Krējums saldais 35%',
+      'Krējums skābais 25%', 'Siers Čedaras', 'Siers Holandes', 'Sviests 1×0,2 kg', 'Sviests 1×0,5 kg', 'Cukurs', 'Kviešu milti 405. tips', 'Pūdercukurs', 'Raugs sausais', 'Sāls',
+      'Vanilīna/Vanilas cukurs', 'Kārtainā mīkla', 'Baltais cepamais papīrs', 'Konteineri ar vāciņu', 'Maisiņi ar rokturi', 'Papīra maisiņi maizei', 'Uzlīmju lapiņas marķēšanai',
+      // parauga pieteikuma (§28) preces
+      'Rudzu maize nesagriezta', 'Baltmaize', 'Šprotes eļļā', 'Sakura komplekts', 'Apelsīni sulai'];
+    const have = new Set((await db.admin(`select name from public.products`)).rows.map((r) => r.name));
+    expect(spec.filter((n) => !have.has(n))).toEqual([]);
+    const cats = (await db.admin(`select name from public.product_categories order by sort_order`)).rows.map((r) => r.name);
+    expect(cats).toEqual(['Augļi un dārzeņi', 'Gaļa un putnu gaļa', 'Zivis un jūras produkti', 'Piena produkti', 'Maize un konditorejas izstrādājumi', 'Olas', 'Konservi', 'Eļļas un mērces',
+      'Sausās preces', 'Milti un cepšanas produkti', 'Garšvielas', 'Rieksti un sēklas', 'Saldētie produkti', 'Iepakojums', 'Vienreizlietojamie materiāli', 'Marķēšanas materiāli', 'Citi']);
+    const units = (await db.admin(`select code from public.units order by sort_order`)).rows.map((r) => r.code);
+    expect(units).toEqual(['kg', 'g', 'L', 'ml', 'gab.', 'iep.', 'rullis', 'komplekts']);
+    // "Piens 2,5% 1×1 L" tiek pasūtīts gabalos, nevis litros
+    const milk = (await db.admin(`select u.code as ordered, b.code as base from public.products p join public.units u on u.id = p.order_unit_id join public.units b on b.id = p.base_unit_id where p.name = 'Piens 2,5% 1×1 L'`)).rows[0];
+    expect(milk).toEqual({ ordered: 'gab.', base: 'L' });
+  });
+
   it('veiktspēja: 10 000 produktu katalogā typeahead un saraksts paliek ātri', async () => {
     const kg = await db.unit('kg');
     await db.admin(

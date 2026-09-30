@@ -243,7 +243,7 @@ label,
   resize: vertical;
 }
 .input::placeholder {
-  color: #8a9096;
+  color: #6b7177;
 }
 .input:hover,
 .select:hover,

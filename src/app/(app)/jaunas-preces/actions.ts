@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import type { FormState } from '@/components/action-form';
 import { actionAdmin, NO_PERMISSION } from '@/lib/auth';
@@ -50,8 +51,6 @@ export async function resolveProposalAction(_prev: FormState, formData: FormData
   revalidatePath('/jaunas-preces');
   revalidatePath('/katalogs', 'layout');
   revalidatePath('/');
-  return {
-    ok: true,
-    message: d.intent === 'approve' ? 'Prece apstiprināta.' : d.intent === 'merge' ? 'Prece pievienota kā sinonīms esošai precei.' : 'Ierosinājums noraidīts.',
-  };
+  // Kartīte pēc lēmuma pazūd no saraksta, tāpēc apstiprinājumu rādām lapas augšā (novirzīšana)
+  redirect(`/jaunas-preces?done=${d.intent}`);
 }

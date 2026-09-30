@@ -101,7 +101,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                     </div>
                     <details className="inline" style={{ marginTop: '0.25rem' }}>
                       <summary className="small">Pāradresēt uz citu preci</summary>
-                      <MoveAliasForm action={moveAliasAction} aliasId={a.id} />
+                      <MoveAliasForm action={moveAliasAction} aliasId={a.id} productId={id} />
                     </details>
                   </li>
                 ))}
