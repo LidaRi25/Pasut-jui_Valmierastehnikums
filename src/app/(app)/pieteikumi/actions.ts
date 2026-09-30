@@ -61,9 +61,8 @@ async function persist(input: unknown): Promise<SaveResult & { parsedId?: string
 
 /** Saglabā pieteikumu kā melnrakstu / saglabā izmaiņas (autosave izmanto to pašu ceļu). */
 export async function saveRequestAction(input: unknown): Promise<SaveResult> {
-  const result = await persist(input);
-  if (result.ok) revalidatePath('/pieteikumi');
-  return result;
+  // Apzināti bez revalidatePath: autosave nedrīkst izraisīt lapas pārrenderēšanu, kamēr lietotājs raksta.
+  return persist(input);
 }
 
 /** Saglabā un iesniedz pieteikumu. Validāciju veic datubāze (nav apejama). */
@@ -135,7 +134,7 @@ export async function proposeProductAction(input: unknown): Promise<ActionResult
     supabase.from('units').select('code').eq('id', hit.order_unit_id).single(),
     hit.category_id ? supabase.from('product_categories').select('name').eq('id', hit.category_id).single() : Promise.resolve({ data: null }),
   ]);
-  revalidatePath('/jaunas-preces');
+  // Bez revalidatePath: tiek izsaukta no pieteikuma redaktora, kura formu nedrīkst pārmontēt (skat. saveRequestAction)
   return {
     ok: true,
     product: {

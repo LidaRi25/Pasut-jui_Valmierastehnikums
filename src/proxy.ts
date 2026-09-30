@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { cookieSecure } from '@/lib/env';
 
 // Proxy (Next.js 16; agrāk "middleware"): sesijas atjaunošana, pieteikšanās pieprasīšana un CSP ar nonce.
 // Svarīgi: šī ir tikai pirmā aizsardzības līnija. Katra lapa, Server Action un API ceļš atkārtoti pārbauda
@@ -33,6 +34,7 @@ export async function proxy(request: NextRequest) {
 
   let response = NextResponse.next({ request: { headers: requestHeaders } });
   const pendingCookies: Array<{ name: string; value: string; options?: Parameters<typeof response.cookies.set>[2] }> = [];
+  const cookieDefaults = { httpOnly: true, sameSite: 'lax' as const, secure: cookieSecure() };
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -48,7 +50,7 @@ export async function proxy(request: NextRequest) {
       setAll(cookiesToSet) {
         for (const { name, value, options } of cookiesToSet) {
           request.cookies.set(name, value);
-          pendingCookies.push({ name, value, options });
+          pendingCookies.push({ name, value, options: { ...options, ...cookieDefaults } });
         }
         requestHeaders.set('cookie', request.headers.get('cookie') ?? '');
         response = NextResponse.next({ request: { headers: requestHeaders } });

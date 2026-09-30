@@ -123,6 +123,7 @@ export function buildPeriodOptions(periods: Period[], currentId: string | null, 
       label: periodOptionLabel(p),
       start: p.start_date,
       end: p.end_date,
+      deadline: p.submission_deadline,
       selectable: isAdmin ? true : p.status === 'open' && new Date(p.submission_deadline) > now,
     }))
     .sort((a, b) => a.start.localeCompare(b.start));

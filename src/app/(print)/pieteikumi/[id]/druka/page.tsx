@@ -88,8 +88,8 @@ export default async function PrintRequestPage({ params }: { params: Promise<{ i
         </div>
         <div className="foot">
           <span>
-            Pieteikums {formatRequestNo(request.request_no)} · {REQUEST_STATUS_LABEL[request.status]}
-            {request.submitted_at ? ` · iesniegts ${formatDateTime(request.submitted_at)}` : ''}
+            Pieteikums {formatRequestNo(request.request_no)} · statuss: {REQUEST_STATUS_LABEL[request.status]}
+            {request.submitted_at ? ` · iesniegšanas laiks: ${formatDateTime(request.submitted_at)}` : ''}
           </span>
           <span>{settings.printFooter}</span>
         </div>

@@ -1,7 +1,7 @@
 import 'server-only';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { supabasePublicKey, supabaseUrl } from '@/lib/env';
+import { cookieSecure, supabasePublicKey, supabaseUrl } from '@/lib/env';
 
 /** Supabase klients ar pašreizējā lietotāja sesiju (sīkdatnes) — visas vaicājumus filtrē RLS. */
 export async function createClient() {
@@ -14,7 +14,7 @@ export async function createClient() {
       setAll(cookiesToSet) {
         try {
           for (const { name, value, options } of cookiesToSet) {
-            cookieStore.set(name, value, options);
+            cookieStore.set(name, value, { ...options, httpOnly: true, sameSite: 'lax', secure: cookieSecure() });
           }
         } catch {
           // Server Component kontekstā sīkdatnes nevar rakstīt; sesiju atjauno proxy.ts

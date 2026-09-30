@@ -37,7 +37,8 @@ export function service() {
 /** Izveido atsevišķu periodu ar nākotnes termiņu, lai testi nebūtu atkarīgi no šodienas datuma */
 export async function createPeriod(label: string) {
   const sb = service();
-  const start = new Date(Date.now() + 10 * 86400_000);
+  // unikāli datumi katrai palaišanai, lai periodi no iepriekšējiem testiem nepārklātos
+  const start = new Date(Date.now() + (30 + Math.floor(Math.random() * 900)) * 86400_000);
   const startDate = start.toISOString().slice(0, 10);
   const end = new Date(start.getTime() + 4 * 86400_000).toISOString().slice(0, 10);
   const { data, error } = await sb
@@ -71,6 +72,8 @@ export interface NewRequest {
   topic: string;
   date: string;
   periodName: string;
+  group?: string;
+  course?: string;
   items: Array<{ search: string; pick: string | RegExp; qty: string }>;
   submit?: boolean;
 }
@@ -80,6 +83,8 @@ export async function createRequestViaUI(page: Page, req: NewRequest): Promise<s
   await page.goto('/pieteikumi/jauns');
   await page.fill('#f-topic', req.topic);
   await page.fill('#f-date', req.date);
+  if (req.group) await page.locator('#f-group').selectOption({ label: req.group });
+  if (req.course) await page.locator('#f-course').selectOption({ label: req.course });
   // periods: izvēlamies skaidri pēc nosaukuma (automātiskā atlase pēc datuma tiek pārbaudīta atsevišķi)
   const period = page.locator('#f-period');
   const value = await period.locator('option', { hasText: req.periodName }).first().getAttribute('value');
@@ -87,8 +92,8 @@ export async function createRequestViaUI(page: Page, req: NewRequest): Promise<s
   for (let i = 0; i < req.items.length; i++) {
     const it = req.items[i];
     const row = page.getByTestId('item-row').nth(i);
-    await row.getByRole('combobox').fill(it.search);
-    await page.getByRole('option', { name: it.pick }).first().click();
+    await row.getByRole('combobox', { name: /^Prece/ }).fill(it.search);
+    await page.getByRole('listbox').getByRole('option', { name: it.pick }).first().click();
     await row.getByLabel(/^Daudzums/).fill(it.qty);
     if (i < req.items.length - 1) await page.getByRole('button', { name: 'Pievienot rindu' }).click();
   }

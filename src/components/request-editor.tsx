@@ -28,6 +28,7 @@ export interface PeriodOption {
   label: string;
   start: string;
   end: string;
+  deadline: string;
   selectable: boolean;
 }
 
@@ -124,6 +125,8 @@ export function RequestEditor({ initial, units, courses, groups, categories, per
         if (!idRef.current) {
           idRef.current = res.id;
           setRequestId(res.id);
+          // Adrese kļūst par /pieteikumi/<id> (atsvaidzināšana atver saglabāto melnrakstu). history.replaceState nepārlādē lapu;
+          // svarīgi, ka redaktora Server Actions neizsauc revalidatePath — citādi Next pārrenderētu maršrutu un pārmontētu formu.
           window.history.replaceState(null, '', `/pieteikumi/${res.id}`);
           setRequestNo('P-' + String(res.requestNo).padStart(6, '0'));
         }
@@ -186,16 +189,16 @@ export function RequestEditor({ initial, units, courses, groups, categories, per
   };
 
   const onDateChange = (date: string) => {
-    setHeader((h) => {
-      let periodId = h.periodId;
-      const current = periods.find((p) => p.id === h.periodId);
-      const covering = periods.filter((p) => p.selectable && date >= p.start && date <= p.end);
-      if (date && covering.length === 1 && (!current || date < current.start || date > current.end)) {
-        periodId = covering[0].id;
-        setPeriodHint('Periods atlasīts automātiski pēc datuma.');
-      }
-      return { ...h, lessonDate: date, periodId };
-    });
+    // Periodu atlasa automātiski pēc datuma: ja pašreizējais periods datumu neaptver, ņem to atvērto periodu,
+    // kas datumu aptver (ja to ir vairāki — to ar tuvāko iesniegšanas termiņu).
+    let periodId = header.periodId;
+    const current = periods.find((p) => p.id === header.periodId);
+    const covering = periods.filter((p) => p.selectable && date >= p.start && date <= p.end).sort((a, b) => a.deadline.localeCompare(b.deadline));
+    if (date && covering.length > 0 && (!current || date < current.start || date > current.end)) {
+      periodId = covering[0].id;
+      setPeriodHint('Periods atlasīts automātiski pēc datuma.');
+    }
+    setHeader((h) => ({ ...h, lessonDate: date, periodId }));
     touch();
   };
 
@@ -504,7 +507,7 @@ export function RequestEditor({ initial, units, courses, groups, categories, per
           </div>
         ))}
 
-        <div className="table-wrap" style={{ boxShadow: 'none' }}>
+        <div className="items-wrap">
           <table className="items-table" aria-label="Preču un materiālu saraksts">
             <thead>
               <tr>

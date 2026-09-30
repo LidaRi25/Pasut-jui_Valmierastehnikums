@@ -215,6 +215,8 @@ async function up() {
     `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:${GATEWAY_PORT}`,
     `NEXT_PUBLIC_SUPABASE_ANON_KEY=${ANON_KEY}`,
     `SUPABASE_SERVICE_ROLE_KEY=${SERVICE_KEY}`,
+    // lokāli testi notiek pa http — sesijas sīkdatnes bez Secure atzīmes
+    'NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3100',
   ].join('\n');
   fs.writeFileSync(path.join(tmp, 'env'), env + '\n');
   console.log('[stack] Gatavs. Vides mainīgie ierakstīti e2e/.tmp/env');

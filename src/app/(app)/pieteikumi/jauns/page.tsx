@@ -18,6 +18,8 @@ export default async function NewRequestPage() {
     <>
       <PageHeader title="Jauns pieteikums" sub="Norādiet nodarbības datus un pievienojiet vajadzīgās preces." />
       <RequestEditor
+        // Jauns key katram apmeklējumam: pārejot uz "Jauns pieteikums" no jau saglabāta melnraksta, forma sākas tukša
+        key={crypto.randomUUID()}
         initial={{
           id: null,
           requestNo: null,

@@ -1286,3 +1286,28 @@ details.inline > .panel {
   border-left: 2px solid var(--green);
   margin-left: 0.3rem;
 }
+
+/* Preču rindu apvalks: bez overflow, lai nolaižamais ieteikumu saraksts netiktu apgriezts */
+.items-wrap {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--white);
+  padding: 0 0.4rem 0.2rem;
+}
+
+@media (max-width: 760px) {
+  /* Telefonā formas lauki vienā kolonnā (span-2 nedrīkst radīt papildu šauras kolonnas) */
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .form-grid .span-2,
+  .form-grid .span-all {
+    grid-column: auto;
+  }
+  .filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .filters .field[style*='span 2'] {
+    grid-column: auto !important;
+  }
+}

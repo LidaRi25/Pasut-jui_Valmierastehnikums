@@ -21,3 +21,13 @@ export function supabasePublicKey(): string {
 export function supabaseServiceKey(): string {
   return required('SUPABASE_SERVICE_ROLE_KEY', process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
+
+/**
+ * Vai sesijas sīkdatnēm jābūt Secure. Ražošanā (HTTPS) — jā. Ja NEXT_PUBLIC_SITE_URL ir norādīts kā http://…
+ * (lokāla izstrāde / testi bez HTTPS), Secure netiek uzstādīts, citādi sīkdatnes netiktu sūtītas.
+ */
+export function cookieSecure(): boolean {
+  const site = process.env.NEXT_PUBLIC_SITE_URL;
+  if (site) return site.startsWith('https://');
+  return process.env.NODE_ENV === 'production';
+}
