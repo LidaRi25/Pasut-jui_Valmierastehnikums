@@ -235,4 +235,27 @@ describe.skipIf(!dbAvailable())('Pieteikumu noteikumi (DB)', () => {
     await expectDbError(db.as(s.teacherA, `select public.save_request(null, '[]'::jsonb, '[]'::jsonb)`), 'VT_INVALID');
     await expectDbError(db.as(s.teacherA, `select public.save_request(null, '{}'::jsonb, '{}'::jsonb)`), 'VT_INVALID');
   });
+
+  it('perioda darbplūsma ir atomāra un atļauj tikai pieļaujamas pārejas', async () => {
+    const period = await db.createPeriod('Darbplūsmas tests', '2027-01-11', '2027-01-15', futureIso(30));
+    const rid = await db.saveRequest(s.teacherA, { ...base(), period_id: period }, [{ product: 'Bietes', quantity: '1' }], { submit: true });
+    const op = (o: string) => db.as(s.admin, `select public.apply_period_action($1, $2) as r`, [period, o]);
+    await expectDbError(db.as(s.teacherA, `select public.apply_period_action($1, 'close')`, [period]), 'VT_FORBIDDEN');
+    await expectDbError(op('nezināma'), 'VT_INVALID');
+    await expectDbError(op('archive'), 'VT_INVALID_TRANSITION'); // atvērtu periodu nevar arhivēt
+    expect((await op('include')).rows[0].r.moved_requests).toBe(1);
+    const st = async () => ({
+      period: (await db.admin(`select status from public.order_periods where id = $1`, [period])).rows[0].status,
+      request: (await db.admin(`select status from public.requests where id = $1`, [rid])).rows[0].status,
+    });
+    expect(await st()).toEqual({ period: 'collecting', request: 'included' });
+    expect((await op('ordered')).rows[0].r.moved_requests).toBe(1);
+    expect(await st()).toEqual({ period: 'ordered', request: 'ordered' });
+    // pasūtītu periodu nevar "pazemināt" atpakaļ uz apkopošanu, atvērt vai vēlreiz pasūtīt
+    for (const o of ['include', 'ordered', 'open', 'close', 'collect']) await expectDbError(op(o), 'VT_INVALID_TRANSITION');
+    expect(await st()).toEqual({ period: 'ordered', request: 'ordered' });
+    await op('archive');
+    expect((await st()).period).toBe('archived');
+    await expectDbError(op('open'), 'VT_INVALID_TRANSITION');
+  });
 });

@@ -68,7 +68,8 @@ grant execute on function
   public.resolve_product_proposal(uuid, text, text, uuid, uuid, uuid, text),
   public.find_similar_products(text[]),
   public.import_products(jsonb),
-  public.update_own_profile(text)
+  public.update_own_profile(text),
+  public.apply_period_action(uuid, text)
   to authenticated;
 
 grant execute on all functions in schema public to service_role;

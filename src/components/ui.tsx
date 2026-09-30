@@ -48,7 +48,8 @@ const FLASH: Record<string, { tone: 'success' | 'error' | 'warn'; text: string }
   created: { tone: 'success', text: 'Ieraksts izveidots.' },
   deleted: { tone: 'success', text: 'Ieraksts izdzēsts.' },
   submitted: { tone: 'success', text: 'Pieteikums iesniegts.' },
-  forbidden: { tone: 'error', text: 'Jums nav tiesību skatīt šo lapu.' },
+  forbidden: { tone: 'error', text: 'Jums nav tiesību skatīt šo lapu vai veikt šo darbību.' },
+  transition: { tone: 'error', text: 'Šādu perioda statusa maiņu veikt nav atļauts (pārbaudiet perioda pašreizējo statusu).' },
 };
 
 /** Ziņojumi no URL (?ok=saved / ?error=... ) — tikai iepriekš definēti teksti, nekad nerāda patvaļīgu URL saturu */

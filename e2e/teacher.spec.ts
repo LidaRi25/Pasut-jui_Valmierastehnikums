@@ -67,6 +67,23 @@ test.describe('Pedagoga darbplūsma: pieteikuma aizpildīšana', () => {
     await page.screenshot({ path: 'e2e/.tmp/shots/04-validation.png', fullPage: true });
   });
 
+  test('ātra Enter nospiešana lēnā tīklā izvēlas pēdējā teksta, nevis iepriekšējā meklējuma rezultātu', async ({ page }) => {
+    await login(page, USERS.sanita.email);
+    await page.goto('/pieteikumi/jauns');
+    // mākslīgi lēna meklēšana (700 ms), lai rezultāti novecotu, kamēr lietotājs raksta
+    await page.route('**/api/products/search*', async (route) => {
+      await new Promise((r) => setTimeout(r, 700));
+      await route.continue();
+    });
+    const combo = page.getByTestId('item-row').nth(0).getByRole('combobox', { name: /^Prece/ });
+    await combo.pressSequentially('bi');
+    await expect(page.getByRole('listbox').getByRole('option').first()).toContainText('Bietes'); // rezultāti par "bi": pirmais — «Bietes»
+    await combo.pressSequentially('etes tv');
+    await combo.press('Enter'); // rezultāti par "bietes tv" vēl nav ienākuši
+    await expect(combo).toHaveValue('Bietes tvaicētas', { timeout: 8000 }); // nevis «Bietes» no vecajiem rezultātiem
+    await expect(page.getByTestId('item-row').nth(0).getByLabel(/^Daudzums/)).toBeFocused();
+  });
+
   test('validācija un brīdinājumi: nederīgs skaitlis, liels daudzums, viena prece divreiz (apvienot rindas)', async ({ page }) => {
     await login(page, USERS.sanita.email);
     await page.goto('/pieteikumi/jauns');

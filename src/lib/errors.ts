@@ -28,6 +28,7 @@ const CODE_MESSAGE: Record<string, string> = {
   VT_ALREADY_RESOLVED: 'Šis ierosinājums jau ir izskatīts.',
   VT_LAST_SYSADMIN: 'Nevar noņemt vai deaktivizēt pēdējo sistēmas administratoru.',
   VT_INVALID: 'Ievadītie dati nav derīgi.',
+  VT_INVALID_TRANSITION: 'Šādu statusa maiņu veikt nav atļauts.',
   VT_CONFLICT: 'Pieteikums starplaikā ir mainīts (citā logā vai ar citu lietotāju). Atsvaidziniet lapu, lai redzētu jaunāko versiju.',
   VT_BAD_QTY: 'Daudzumam jābūt lielākam par 0.',
   VT_AUDIT_IMMUTABLE: 'Audita vēsturi nedrīkst mainīt.',

@@ -8,9 +8,9 @@ import type { FormState } from '@/components/action-form';
 import { actionSysadmin, NO_PERMISSION } from '@/lib/auth';
 import { fail, GENERIC_ERROR } from '@/lib/errors';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { UUID_RE } from '@/lib/uuid';
 import { createClient } from '@/lib/supabase/server';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ROLES = ['teacher', 'admin', 'sysadmin'] as const;
 
 function generatePassword(): string {
@@ -73,20 +73,31 @@ export async function updateUserAction(_prev: FormState, formData: FormData): Pr
   const { id, full_name, role } = parsed.data;
   const active = formData.get('is_active') === 'on';
   const supabase = await createClient();
+  const admin = createAdminClient();
+  const setBan = async (banned: boolean) => {
+    const { error } = await admin.auth.admin.updateUserById(id, { ban_duration: banned ? '876000h' : 'none' });
+    if (error) console.error('[updateUser ban]', error.message);
+    return !error;
+  };
 
-  // Vispirms loma (var izgāzties ar VT_LAST_SYSADMIN), tad profils
+  // Deaktivizējot: vispirms liedzam pieteikšanos Auth līmenī (ja tas neizdodas, neko nemainām)
+  if (!active && !(await setBan(true))) {
+    return { error: 'Neizdevās bloķēt lietotāja kontu pieteikšanās sistēmā. Nekas netika mainīts — mēģiniet vēlreiz.' };
+  }
+
+  // Loma (var izgāzties ar VT_LAST_SYSADMIN), tad profils
   const r1 = await supabase.from('user_roles').update({ role }).eq('user_id', id).select('user_id');
-  if (r1.error) return fail(r1.error);
-  if (!r1.data?.length) return { error: 'Lietotājs nav atrasts.' };
-  const r2 = await supabase.from('profiles').update({ full_name, is_active: active }).eq('id', id).select('id');
-  if (r2.error) return fail(r2.error);
+  const r2 = r1.error || !r1.data?.length ? null : await supabase.from('profiles').update({ full_name, is_active: active }).eq('id', id).select('id');
+  const failure = r1.error ?? r2?.error ?? null;
+  if (failure || !r1.data?.length || !r2?.data?.length) {
+    if (!active) await setBan(false); // atgriežam kā bija
+    if (failure) return fail(failure);
+    return { error: 'Lietotājs nav atrasts.' };
+  }
 
-  // Deaktivizētam kontam papildus liedzam pieteikšanos Auth līmenī
-  try {
-    const admin = createAdminClient();
-    await admin.auth.admin.updateUserById(id, { ban_duration: active ? 'none' : '876000h' });
-  } catch (e) {
-    console.error('[updateUser ban]', e);
+  // Aktivizējot: atbloķējam Auth kontu (ja neizdodas — skaidri paziņojam)
+  if (active && !(await setBan(false))) {
+    return { error: 'Lietotājs saglabāts, bet Auth konta atbloķēšana neizdevās. Saglabājiet vēlreiz.' };
   }
   revalidatePath('/lietotaji');
   return { ok: true, message: 'Lietotājs saglabāts.' };

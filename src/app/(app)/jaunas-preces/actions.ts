@@ -1,5 +1,6 @@
 'use server';
 
+import { UUID_RE } from '@/lib/uuid';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
@@ -8,16 +9,15 @@ import { actionAdmin, NO_PERMISSION } from '@/lib/auth';
 import { fail } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const opt = (v: FormDataEntryValue | null) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
 
 const schema = z.object({
-  id: z.string().regex(UUID),
+  id: z.string().regex(UUID_RE),
   intent: z.enum(['approve', 'merge', 'reject']),
   name: z.string().max(200).nullable(),
-  category_id: z.string().regex(UUID).nullable(),
-  unit_id: z.string().regex(UUID).nullable(),
-  target: z.string().regex(UUID).nullable(),
+  category_id: z.string().regex(UUID_RE).nullable(),
+  unit_id: z.string().regex(UUID_RE).nullable(),
+  target: z.string().regex(UUID_RE).nullable(),
   note: z.string().max(500).nullable(),
 });
 

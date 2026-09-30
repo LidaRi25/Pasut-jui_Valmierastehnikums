@@ -8,8 +8,8 @@ import { actionAdmin, actionUser, NO_PERMISSION } from '@/lib/auth';
 import { parseDecimal } from '@/lib/decimal';
 import { fail } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
+import { UUID_RE } from '@/lib/uuid';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const uuid = z.string().regex(UUID_RE);
 const optUuid = z.preprocess((v) => (v === '' || v === null ? null : v), uuid.nullable());
 const optText = (max: number) => z.preprocess((v) => (typeof v === 'string' && v.trim() === '' ? null : v), z.string().trim().max(max).nullable());
@@ -75,7 +75,8 @@ export async function updateProductAction(_prev: FormState, formData: FormData):
   const { error } = await supabase
     .from('products')
     .update({ ...rest, package_quantity: pkg.value, is_active: formData.get('is_active') === 'on' })
-    .eq('id', id);
+    .eq('id', id)
+    .is('merged_into', null); // apvienotu (vēsturisku) preci nelabojam
   if (error) {
     if (error.code === '23505') return { error: 'Cita prece ar šādu nosaukumu jau eksistē. Ja tā ir tā pati prece, izmantojiet apvienošanu.' };
     return fail(error);

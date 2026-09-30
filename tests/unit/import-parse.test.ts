@@ -14,9 +14,9 @@ describe('kataloga imports: CSV', () => {
   });
 
   it('atbalsta komatu, tabulāciju, pēdiņas ar komatu laukā un BOM', () => {
-    expect(parseCsv('﻿a,b\n"x, y",2\n')).toEqual([['a', 'b'], ['x, y', '2']]);
-    expect(parseCsv('a\tb\n1\t2')).toEqual([['a', 'b'], ['1', '2']]);
-    expect(parseCsv('a;b\n"pēdiņas ""iekšā""";2')).toEqual([['a', 'b'], ['pēdiņas "iekšā"', '2']]);
+    expect(parseCsv('\uFEFFa,b\n"x, y",2\n', ',')).toEqual([['a', 'b'], ['x, y', '2']]);
+    expect(parseCsv('a\tb\n1\t2', '\t')).toEqual([['a', 'b'], ['1', '2']]);
+    expect(parseCsv('a;b\n"pēdiņas ""iekšā""";2', ';')).toEqual([['a', 'b'], ['pēdiņas "iekšā"', '2']]);
   });
 
   it('nolasa windows-1257 kodējumu (Excel "CSV ANSI")', async () => {
@@ -24,6 +24,15 @@ describe('kataloga imports: CSV', () => {
     const bytes = Buffer.from([...text].map((ch) => ({ Ķ: 0xcd, ī: 0xee, ē: 0xe7, ķ: 0xed }[ch as 'Ķ'] ?? ch.charCodeAt(0))));
     const r = await parseImportFile(bytes, 'ansi.csv');
     expect(r.rows[0].name).toBe('Ķirbis');
+  });
+
+  it('norobežotājs tiek noteikts pēc galvenes rindas, arī ja faila sākumā ir virsraksts vai tukšas rindas', async () => {
+    const csv = 'Preču saraksts 2026\n\nPreces nosaukums;Mērvienība;Kategorija\nSalāti, ledus;kg;Augļi un dārzeņi\n';
+    const r = await parseImportFile(buf(csv), 'ar-virsrakstu.csv');
+    expect(r.rows).toHaveLength(1);
+    expect(r.rows[0]).toMatchObject({ name: 'Salāti, ledus', unit: 'kg', category: 'Augļi un dārzeņi' }); // komats nosaukumā netiek uzskatīts par atdalītāju
+    const tab = await parseImportFile(buf('Nosaukums\tMērv.\nBietes\tkg'), 'tab.csv');
+    expect(tab.rows[0]).toMatchObject({ name: 'Bietes', unit: 'kg' });
   });
 
   it('noraida failu bez nosaukuma kolonnas, neatbalstītu paplašinājumu un bināru saturu', async () => {

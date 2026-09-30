@@ -192,7 +192,9 @@ create table public.products (
   approved_at         timestamptz,
   approved_by         uuid references public.profiles (id) on delete set null,
   updated_at          timestamptz not null default now(),
-  check (merged_into is null or merged_into <> id)
+  check (merged_into is null or merged_into <> id),
+  -- Apvienota (kļūdaini izveidota) prece nedrīkst kļūt atkal aktīva — vēsture paliek neskarta
+  check (merged_into is null or not is_active)
 );
 -- Vienāds normalizētais nosaukums nav atļauts (izņemot apvienotos un noraidītos ierakstus).
 -- "Sviests 1×0,2 kg" un "Sviests 1×0,5 kg" ir dažādi nosaukumi, tāpēc netiek apvienoti.
@@ -1931,6 +1933,55 @@ begin
 end;
 $$;
 
+-- ---------- Perioda darbplūsma (atomāri, ar atļauto pāreju pārbaudi) ------------------------------------------------------------------
+-- open     — atvērt pieteikumiem (no: slēgts, apkopošanā)
+-- close    — slēgt iesniegšanu (no: atvērts)
+-- collect  — sākt apkopošanu (no: atvērts, slēgts)
+-- include  — iesniegtos/apstiprinātos pieteikumus atzīmēt kā "Iekļauts pasūtījumā", periods -> apkopošanā (no: atvērts, slēgts, apkopošanā)
+-- ordered  — pieteikumus atzīmēt kā "Pasūtīts", periods -> pasūtīts (no: atvērts, slēgts, apkopošanā)
+-- archive  — arhivēt (no: slēgts, apkopošanā, pasūtīts)
+create or replace function public.apply_period_action(p_period_id uuid, p_op text)
+returns jsonb
+language plpgsql
+set search_path = public
+as $$
+declare
+  v_period public.order_periods;
+  v_moved integer := 0;
+begin
+  if not public.is_admin() then
+    raise exception 'VT_FORBIDDEN';
+  end if;
+  select * into v_period from public.order_periods where id = p_period_id for update;
+  if not found then
+    raise exception 'VT_NOT_FOUND';
+  end if;
+
+  if p_op = 'open' and v_period.status in ('closed', 'collecting') then
+    update public.order_periods set status = 'open' where id = p_period_id;
+  elsif p_op = 'close' and v_period.status = 'open' then
+    update public.order_periods set status = 'closed' where id = p_period_id;
+  elsif p_op = 'collect' and v_period.status in ('open', 'closed') then
+    update public.order_periods set status = 'collecting' where id = p_period_id;
+  elsif p_op = 'include' and v_period.status in ('open', 'closed', 'collecting') then
+    update public.requests set status = 'included' where period_id = p_period_id and status in ('submitted', 'approved');
+    get diagnostics v_moved = row_count;
+    update public.order_periods set status = 'collecting' where id = p_period_id;
+  elsif p_op = 'ordered' and v_period.status in ('open', 'closed', 'collecting') then
+    update public.requests set status = 'ordered' where period_id = p_period_id and status in ('submitted', 'approved', 'included');
+    get diagnostics v_moved = row_count;
+    update public.order_periods set status = 'ordered' where id = p_period_id;
+  elsif p_op = 'archive' and v_period.status in ('closed', 'collecting', 'ordered') then
+    update public.order_periods set status = 'archived' where id = p_period_id;
+  elsif p_op in ('open', 'close', 'collect', 'include', 'ordered', 'archive') then
+    raise exception 'VT_INVALID_TRANSITION';
+  else
+    raise exception 'VT_INVALID';
+  end if;
+  return jsonb_build_object('moved_requests', v_moved);
+end;
+$$;
+
 -- >>>>>>>>>> migrācija: 20260901000600_reference_data_and_grants.sql
 -- =============================================================================
 -- 06: obligātie atsauces dati (mērvienības, kategorijas, iestatījumi) un funkciju tiesības
@@ -2002,7 +2053,8 @@ grant execute on function
   public.resolve_product_proposal(uuid, text, text, uuid, uuid, uuid, text),
   public.find_similar_products(text[]),
   public.import_products(jsonb),
-  public.update_own_profile(text)
+  public.update_own_profile(text),
+  public.apply_period_action(uuid, text)
   to authenticated;
 
 grant execute on all functions in schema public to service_role;

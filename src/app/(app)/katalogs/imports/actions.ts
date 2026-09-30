@@ -96,6 +96,8 @@ export async function previewImportAction(formData: FormData): Promise<ActionRes
 
     if (!r.name) issues.push('Trūkst preces nosaukuma.');
     else if (r.name.length > 200) issues.push('Nosaukums ir garāks par 200 simboliem.');
+    if (r.packaging.length > 200) issues.push('Iepakojuma apraksts ir garāks par 200 simboliem.');
+    if (r.notes.length > 500) issues.push('Piezīme ir garāka par 500 simboliem.');
 
     const unit = r.unit ? unitMap.get(norm(r.unit).replace(/\.$/, '')) : undefined;
     if (!r.unit) issues.push('Nav norādīta mērvienība.');
@@ -110,7 +112,7 @@ export async function previewImportAction(formData: FormData): Promise<ActionRes
     if (key && seen.has(key)) rowConflicts.push({ kind: 'in_file', product: `dublē ${seen.get(key)}. rindu failā` });
     else if (key) seen.set(key, r.line);
 
-    const hardError = !r.name || r.name.length > 200 || !unit;
+    const hardError = !r.name || r.name.length > 200 || r.packaging.length > 200 || r.notes.length > 500 || !unit;
     const hasExact = rowConflicts.some((c) => c.kind === 'exact' || c.kind === 'alias' || c.kind === 'in_file');
     if (hardError) status = 'error';
     else if (hasExact) status = 'conflict';

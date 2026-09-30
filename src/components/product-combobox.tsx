@@ -52,6 +52,9 @@ export function ProductCombobox({
   const reactId = useId();
   const listId = `${reactId}-list`;
   const [hits, setHits] = useState<ProductHit[]>([]);
+  // Kuram meklējuma tekstam pieder `hits`. Ja tas atšķiras no pašreizējā teksta, rezultāti ir novecojuši
+  // (lietotājs turpinājis rakstīt) un tos NEDRĪKST izvēlēties ar Enter/Tab.
+  const [resultsFor, setResultsFor] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -61,14 +64,20 @@ export function ProductCombobox({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focusedRef = useRef(false);
   const lastQueryRef = useRef('');
+  const queryRef = useRef(query);
+  const pendingChooseRef = useRef(false);
+  const chooseRef = useRef<(hit: ProductHit) => void>(() => {});
 
-  const canPropose = Boolean(onPropose) && query.trim().length >= 2;
+  const fresh = resultsFor === query.trim();
+  // "Ierosināt jaunu preci" tikai tad, kad meklēšana pabeigta (nevis brīdī, kad rezultāti vēl nav ienākuši)
+  const canPropose = Boolean(onPropose) && query.trim().length >= 2 && (fresh || failed);
   const optionCount = hits.length + (canPropose ? 1 : 0);
 
   const runSearch = useCallback((q: string) => {
     abortRef.current?.abort();
     if (q.trim().length < 2) {
       setHits([]);
+      setResultsFor(q.trim());
       setLoading(false);
       return;
     }
@@ -82,9 +91,16 @@ export function ProductCombobox({
         return (await res.json()) as { items: ProductHit[] };
       })
       .then((json) => {
-        setHits(json.items ?? []);
+        const items = json.items ?? [];
+        setHits(items);
+        setResultsFor(q.trim());
         setActive(0);
         setLoading(false);
+        // Lietotājs nospieda Enter, kamēr rezultāti vēl nebija ienākuši: izvēlamies pirmo rezultātu TIKAI ja teksts nav mainījies
+        if (pendingChooseRef.current && queryRef.current.trim() === q.trim()) {
+          pendingChooseRef.current = false;
+          if (items.length > 0) chooseRef.current(items[0]);
+        }
       })
       .catch((e: unknown) => {
         if ((e as { name?: string }).name === 'AbortError') return;
@@ -116,6 +132,11 @@ export function ProductCombobox({
     onAfterSelect?.();
   };
 
+  useEffect(() => {
+    queryRef.current = query;
+    chooseRef.current = choose;
+  });
+
   const proposeNow = () => {
     setOpen(false);
     onPropose?.(query.trim());
@@ -136,10 +157,15 @@ export function ProductCombobox({
         setNavigated(true);
       }
     } else if (e.key === 'Enter') {
-      if (open && optionCount > 0) {
+      if (open && query.trim().length >= 2 && !selected) {
         e.preventDefault();
-        if (active < hits.length) choose(hits[active]);
-        else proposeNow();
+        if (!fresh && !failed) {
+          // Rezultāti vēl attiecas uz iepriekšējo tekstu — pagaidām un izvēlamies, tiklīdz ienāk atbilstošie
+          pendingChooseRef.current = true;
+        } else if (optionCount > 0) {
+          if (active < hits.length) choose(hits[active]);
+          else proposeNow();
+        }
       }
     } else if (e.key === 'Escape') {
       if (open) {
@@ -148,7 +174,7 @@ export function ProductCombobox({
       }
     } else if (e.key === 'Tab') {
       // Tab pieņem izvēli tikai tad, ja lietotājs to apzināti iezīmējis vai ievadītais teksts precīzi sakrīt
-      if (open && hits.length > 0 && !e.shiftKey) {
+      if (open && fresh && hits.length > 0 && !e.shiftKey) {
         const candidate = hits[active] ?? hits[0];
         const exact = hits.find((h) => h.name.toLowerCase() === query.trim().toLowerCase());
         if (navigated && active < hits.length) {
@@ -165,7 +191,7 @@ export function ProductCombobox({
   const showList = open && !selected && query.trim().length >= 2;
   const statusText = failed
     ? 'Meklēšana īslaicīgi nav pieejama. Mēģiniet vēlreiz.'
-    : loading && hits.length === 0
+    : !fresh
       ? 'Meklē…'
       : hits.length === 0
         ? 'Katalogā nekas netika atrasts.'
@@ -182,6 +208,7 @@ export function ProductCombobox({
         aria-expanded={showList && optionCount > 0}
         aria-controls={showList && optionCount > 0 ? listId : undefined}
         aria-autocomplete="list"
+        aria-busy={loading || undefined}
         aria-activedescendant={showList && optionCount > 0 ? `${listId}-${active}` : undefined}
         aria-label={ariaLabel}
         aria-invalid={invalid || undefined}
@@ -193,6 +220,7 @@ export function ProductCombobox({
         disabled={disabled}
         value={query}
         onChange={(e) => {
+          pendingChooseRef.current = false;
           setNavigated(false);
           setOpen(true);
           onQueryChange(e.target.value);

@@ -818,3 +818,52 @@ begin
   update public.profiles set full_name = v_name where id = auth.uid();
 end;
 $$;
+
+-- ---------- Perioda darbplūsma (atomāri, ar atļauto pāreju pārbaudi) ------------------------------------------------------------------
+-- open     — atvērt pieteikumiem (no: slēgts, apkopošanā)
+-- close    — slēgt iesniegšanu (no: atvērts)
+-- collect  — sākt apkopošanu (no: atvērts, slēgts)
+-- include  — iesniegtos/apstiprinātos pieteikumus atzīmēt kā "Iekļauts pasūtījumā", periods -> apkopošanā (no: atvērts, slēgts, apkopošanā)
+-- ordered  — pieteikumus atzīmēt kā "Pasūtīts", periods -> pasūtīts (no: atvērts, slēgts, apkopošanā)
+-- archive  — arhivēt (no: slēgts, apkopošanā, pasūtīts)
+create or replace function public.apply_period_action(p_period_id uuid, p_op text)
+returns jsonb
+language plpgsql
+set search_path = public
+as $$
+declare
+  v_period public.order_periods;
+  v_moved integer := 0;
+begin
+  if not public.is_admin() then
+    raise exception 'VT_FORBIDDEN';
+  end if;
+  select * into v_period from public.order_periods where id = p_period_id for update;
+  if not found then
+    raise exception 'VT_NOT_FOUND';
+  end if;
+
+  if p_op = 'open' and v_period.status in ('closed', 'collecting') then
+    update public.order_periods set status = 'open' where id = p_period_id;
+  elsif p_op = 'close' and v_period.status = 'open' then
+    update public.order_periods set status = 'closed' where id = p_period_id;
+  elsif p_op = 'collect' and v_period.status in ('open', 'closed') then
+    update public.order_periods set status = 'collecting' where id = p_period_id;
+  elsif p_op = 'include' and v_period.status in ('open', 'closed', 'collecting') then
+    update public.requests set status = 'included' where period_id = p_period_id and status in ('submitted', 'approved');
+    get diagnostics v_moved = row_count;
+    update public.order_periods set status = 'collecting' where id = p_period_id;
+  elsif p_op = 'ordered' and v_period.status in ('open', 'closed', 'collecting') then
+    update public.requests set status = 'ordered' where period_id = p_period_id and status in ('submitted', 'approved', 'included');
+    get diagnostics v_moved = row_count;
+    update public.order_periods set status = 'ordered' where id = p_period_id;
+  elsif p_op = 'archive' and v_period.status in ('closed', 'collecting', 'ordered') then
+    update public.order_periods set status = 'archived' where id = p_period_id;
+  elsif p_op in ('open', 'close', 'collect', 'include', 'ordered', 'archive') then
+    raise exception 'VT_INVALID_TRANSITION';
+  else
+    raise exception 'VT_INVALID';
+  end if;
+  return jsonb_build_object('moved_requests', v_moved);
+end;
+$$;

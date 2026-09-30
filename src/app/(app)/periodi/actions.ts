@@ -8,9 +8,10 @@ import { actionAdmin, NO_PERMISSION } from '@/lib/auth';
 import { fail } from '@/lib/errors';
 import { formatDate, localRigaToIso } from '@/lib/format';
 import { PERIOD_STATUSES } from '@/lib/labels';
+import { safeInternalPath } from '@/lib/safe-path';
+import { UUID_RE } from '@/lib/uuid';
 import { createClient } from '@/lib/supabase/server';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const schema = z.object({
   id: z.string().regex(UUID_RE).optional().or(z.literal('')),
   name: z.string().trim().max(120),
@@ -49,7 +50,7 @@ const opSchema = z.object({
 });
 
 /**
- * Perioda darbplūsma:
+ * Perioda darbplūsma (atomāra datubāzes funkcija apply_period_action ar atļauto pāreju pārbaudi):
  *  open — atvērt; close — slēgt; collect — sākt apkopošanu;
  *  include — iesniegtos/apstiprinātos pieteikumus atzīmēt kā "Iekļauts pasūtījumā";
  *  ordered — pieteikumus atzīmēt kā "Pasūtīts" un periodu kā "Pasūtīts"; archive — arhivēt.
@@ -61,25 +62,17 @@ export async function periodWorkflowAction(formData: FormData): Promise<void> {
   const parsed = opSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) redirect('/periodi');
   const { period_id, op, back } = parsed.data;
+  const dest = safeInternalPath(back, `/pasutijums?period=${period_id}`);
+  const sep = dest.includes('?') ? '&' : '?';
   const supabase = await createClient();
-  const dest = back && back.startsWith('/') && !back.startsWith('//') ? back : `/pasutijums?period=${period_id}`;
-  let error: { message?: string; code?: string } | null = null;
-  const setPeriod = async (status: string) => (await supabase.from('order_periods').update({ status }).eq('id', period_id)).error;
-  if (op === 'open') error = await setPeriod('open');
-  else if (op === 'close') error = await setPeriod('closed');
-  else if (op === 'collect') error = await setPeriod('collecting');
-  else if (op === 'archive') error = await setPeriod('archived');
-  else if (op === 'include') {
-    error = (await supabase.from('requests').update({ status: 'included' }).eq('period_id', period_id).in('status', ['submitted', 'approved'])).error;
-    if (!error) error = await setPeriod('collecting');
-  } else if (op === 'ordered') {
-    error = (await supabase.from('requests').update({ status: 'ordered' }).eq('period_id', period_id).in('status', ['submitted', 'approved', 'included'])).error;
-    if (!error) error = await setPeriod('ordered');
-  }
+  const { error } = await supabase.rpc('apply_period_action', { p_period_id: period_id, p_op: op });
   revalidatePath('/pasutijums');
   revalidatePath('/pieteikumi');
   revalidatePath('/periodi');
   revalidatePath('/', 'layout');
-  if (error) redirect(`${dest}${dest.includes('?') ? '&' : '?'}error=forbidden`);
-  redirect(`${dest}${dest.includes('?') ? '&' : '?'}ok=saved`);
+  if (error) {
+    console.error('[period action]', error.code, error.message);
+    redirect(`${dest}${sep}error=${(error.message ?? '').includes('VT_INVALID_TRANSITION') ? 'transition' : 'forbidden'}`);
+  }
+  redirect(`${dest}${sep}ok=saved`);
 }

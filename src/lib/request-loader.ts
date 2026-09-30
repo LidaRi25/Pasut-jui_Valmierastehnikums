@@ -7,7 +7,8 @@ import type { PeriodOption } from '@/components/request-editor';
 import { periodOptionLabel } from '@/lib/data';
 import type { Period } from '@/lib/types';
 
-export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { UUID_RE } from '@/lib/uuid';
+export { UUID_RE };
 
 interface RawItem {
   id: string;

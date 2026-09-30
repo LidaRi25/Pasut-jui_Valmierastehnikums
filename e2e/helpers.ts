@@ -37,17 +37,22 @@ export function service() {
 /** Izveido atsevišķu periodu ar nākotnes termiņu, lai testi nebūtu atkarīgi no šodienas datuma */
 export async function createPeriod(label: string) {
   const sb = service();
-  // unikāli datumi katrai palaišanai, lai periodi no iepriekšējiem testiem nepārklātos
-  const start = new Date(Date.now() + (30 + Math.floor(Math.random() * 900)) * 86400_000);
-  const startDate = start.toISOString().slice(0, 10);
-  const end = new Date(start.getTime() + 4 * 86400_000).toISOString().slice(0, 10);
-  const { data, error } = await sb
-    .from('order_periods')
-    .insert({ name: label, start_date: startDate, end_date: end, submission_deadline: new Date(Date.now() + 5 * 86400_000).toISOString(), status: 'open' })
-    .select('id, name')
-    .single();
-  if (error) throw error;
-  return { id: data.id as string, name: data.name as string, date: startDate };
+  // Unikāli, ar esošajiem periodiem nepārklājošies datumi (periodu automātiskā atlase pēc datuma ir viennozīmīga)
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const start = new Date(Date.now() + (30 + Math.floor(Math.random() * 3000)) * 86400_000);
+    const startDate = start.toISOString().slice(0, 10);
+    const end = new Date(start.getTime() + 4 * 86400_000).toISOString().slice(0, 10);
+    const overlap = await sb.from('order_periods').select('id').lte('start_date', end).gte('end_date', startDate).limit(1);
+    if (overlap.data?.length) continue;
+    const { data, error } = await sb
+      .from('order_periods')
+      .insert({ name: label, start_date: startDate, end_date: end, submission_deadline: new Date(Date.now() + 5 * 86400_000).toISOString(), status: 'open' })
+      .select('id, name')
+      .single();
+    if (error) throw error;
+    return { id: data.id as string, name: data.name as string, date: startDate };
+  }
+  throw new Error('Neizdevās atrast brīvu perioda datumu e2e testam.');
 }
 
 export async function login(page: Page, email: string, password = PASSWORD) {

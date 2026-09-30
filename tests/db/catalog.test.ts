@@ -126,6 +126,16 @@ describe.skipIf(!dbAvailable())('Produktu katalogs, sinonīmi, ierosinājumi (DB
     expect(sum.rows[0].total_quantity).toBe('2.000');
   });
 
+  it('apvienota prece nekad nevar kļūt atkal aktīva', async () => {
+    const unit = await db.unit('kg');
+    const wrong = (await db.as(s.teacherB, `select public.propose_product('Kļūdaina prece ${Date.now()}', $1) as r`, [unit])).rows[0].r.id;
+    const target = await db.product('Siers Čedaras');
+    await db.as(s.admin, `select public.merge_products($1, $2)`, [wrong, target]);
+    await expect(db.as(s.admin, `update public.products set is_active = true where id = $1`, [wrong])).rejects.toThrow(/products_check|check constraint/);
+    const row = (await db.admin(`select is_active, merged_into from public.products where id = $1`, [wrong])).rows[0];
+    expect(row).toEqual({ is_active: false, merged_into: target });
+  });
+
   it('noraidīta prece netiek meklēšanā un pedagogs to nevar izmantot; nosaukums atbrīvojas', async () => {
     const unit = await db.unit('kg');
     const pid = (await db.as(s.teacherC, `select public.propose_product('Zelta pārslas', $1) as r`, [unit])).rows[0].r.id;

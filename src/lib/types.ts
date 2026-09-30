@@ -143,8 +143,12 @@ export interface OrderLine {
   product_name: string;
   category_id: string | null;
   category_name: string | null;
+  category_sort: number | null;
   approval_status: ApprovalStatus;
   product_active: boolean;
+  base_unit_id: string;
+  order_unit_id: string;
+  package_quantity: string | number | null;
   unit_id: string;
   unit_code: string;
   quantity: string | number;

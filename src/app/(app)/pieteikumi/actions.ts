@@ -8,8 +8,8 @@ import { fail, GENERIC_ERROR, type ActionResult } from '@/lib/errors';
 import { REQUEST_STATUSES, type RequestStatus } from '@/lib/labels';
 import { createClient } from '@/lib/supabase/server';
 import type { ProductHit } from '@/lib/types';
+import { UUID_RE } from '@/lib/uuid';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const uuid = z.string().regex(UUID_RE);
 const nullableUuid = uuid.nullable();
 

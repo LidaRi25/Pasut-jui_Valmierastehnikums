@@ -12,7 +12,8 @@ const line = (over: Partial<OrderLine>): OrderLine => ({
   item_id: 'i', request_id: 'r', request_no: 1, request_status: 'submitted', period_id: 'per', teacher_id: 't', teacher_name: 'Sanita Reinfelde',
   course_id: null, course_name: '4. kurss', group_id: 'g', group_name: '6. grupa', students: null, topic: 'Baltic VET Skills 2026', lesson_date: '2026-10-29',
   student_count: 1, request_notes: null, product_id: 'p1', product_name: 'Bietes tvaicētas', category_id: 'c1', category_name: 'Augļi un dārzeņi',
-  approval_status: 'approved', product_active: true, unit_id: 'u-kg', unit_code: 'kg', quantity: '0.5', item_notes: null, item_position: 1, ...over,
+  approval_status: 'approved', product_active: true, category_sort: 10, base_unit_id: 'u-kg', order_unit_id: 'u-kg', package_quantity: null,
+  unit_id: 'u-kg', unit_code: 'kg', quantity: '0.5', item_notes: null, item_position: 1, ...over,
 });
 const lines: OrderLine[] = [
   line({ item_id: 'a', request_no: 1, quantity: 0.5 }),

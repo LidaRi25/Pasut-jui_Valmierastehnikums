@@ -3,7 +3,8 @@ import { actionUser } from '@/lib/auth';
 import { getReference, getSettings } from '@/lib/data';
 import { buildOrderWorkbook } from '@/lib/excel/order-workbook';
 import { isAdminRole } from '@/lib/labels';
-import { describeFilters, loadLines, loadReport, loadSummary } from '@/lib/order-data';
+import { describeFilters, loadLines } from '@/lib/order-data';
+import { reportLines, summarizeLines } from '@/lib/order-aggregate';
 import { parseOrderFilters } from '@/lib/order-filters';
 import { todayRiga } from '@/lib/format';
 import { createClient } from '@/lib/supabase/server';
@@ -30,27 +31,21 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient();
   try {
     const [ref, settings] = await Promise.all([getReference(), getSettings()]);
-    const [summary, lines, byTeacher, byGroup, byDate, byCategory, desc] = await Promise.all([
-      loadSummary(supabase, filters),
-      loadLines(supabase, filters),
-      loadReport(supabase, 'teacher', filters),
-      loadReport(supabase, 'group', filters),
-      loadReport(supabase, 'date', filters),
-      loadReport(supabase, 'category', filters),
-      describeFilters(supabase, filters, ref),
-    ]);
+    // Viens order_lines izvilkums = viens datu momentuzņēmums; visas lapas tiek aprēķinātas no tā (precīza BigInt aritmētika)
+    const [lines, desc] = await Promise.all([loadLines(supabase, filters), describeFilters(supabase, filters, ref)]);
+    const unitCodes = new Map(ref.units.map((u) => [u.id, u.code]));
     const buffer = await buildOrderWorkbook({
       institution: settings.institutionName,
       periodLabel: desc.periodLabel,
       filterLines: desc.lines,
       generatedAt: new Date(),
       generatedBy: user.fullName,
-      summary,
+      summary: summarizeLines(lines, unitCodes),
       lines,
-      byTeacher,
-      byGroup,
-      byDate,
-      byCategory,
+      byTeacher: reportLines(lines, 'teacher'),
+      byGroup: reportLines(lines, 'group'),
+      byDate: reportLines(lines, 'date'),
+      byCategory: reportLines(lines, 'category'),
       countableUnits: new Set(ref.units.filter((u) => u.is_countable).map((u) => u.code)),
     });
     const period = filters.period ? ref.periods.find((p) => p.id === filters.period) : null;

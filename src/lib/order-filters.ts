@@ -1,7 +1,7 @@
 // Administratora filtru apstrāde: vienota validācija lapām, API un Excel eksportam.
+import { UUID_RE } from '@/lib/uuid';
 import { ORDER_STATUSES, REQUEST_STATUSES, type RequestStatus } from '@/lib/labels';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export interface OrderFilters {
@@ -32,7 +32,7 @@ function getAll(source: Source, key: string): string[] {
   return Array.isArray(v) ? v : [v];
 }
 
-const uuid = (v: string | undefined) => (v && UUID.test(v) ? v : undefined);
+const uuid = (v: string | undefined) => (v && UUID_RE.test(v) ? v : undefined);
 const date = (v: string | undefined) => {
   if (!v || !ISO_DATE.test(v)) return undefined;
   const d = new Date(v + 'T00:00:00Z');

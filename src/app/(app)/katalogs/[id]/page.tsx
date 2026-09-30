@@ -60,29 +60,31 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
       ) : null}
 
       <div className="grid-2">
-        <section className="card" aria-labelledby="h-edit">
-          <div className="card-title">
-            <h2 id="h-edit">Preces dati</h2>
-          </div>
-          <ProductForm
-            action={updateProductAction}
-            units={ref.units}
-            categories={ref.categories}
-            submitLabel="Saglabāt izmaiņas"
-            defaults={{
-              id: product.id,
-              name: product.name,
-              category_id: product.category_id,
-              base_unit_id: product.base_unit_id,
-              order_unit_id: product.order_unit_id,
-              package_description: product.package_description,
-              package_quantity: numStr(product.package_quantity),
-              barcode: product.barcode,
-              notes: product.notes,
-              is_active: product.is_active,
-            }}
-          />
-        </section>
+        {product.merged_into ? null : (
+          <section className="card" aria-labelledby="h-edit">
+            <div className="card-title">
+              <h2 id="h-edit">Preces dati</h2>
+            </div>
+            <ProductForm
+              action={updateProductAction}
+              units={ref.units}
+              categories={ref.categories}
+              submitLabel="Saglabāt izmaiņas"
+              defaults={{
+                id: product.id,
+                name: product.name,
+                category_id: product.category_id,
+                base_unit_id: product.base_unit_id,
+                order_unit_id: product.order_unit_id,
+                package_description: product.package_description,
+                package_quantity: numStr(product.package_quantity),
+                barcode: product.barcode,
+                notes: product.notes,
+                is_active: product.is_active,
+              }}
+            />
+          </section>
+        )}
 
         <div>
           <section className="card" aria-labelledby="h-alias">

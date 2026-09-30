@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
+import { safeInternalPath } from '@/lib/safe-path';
 import { createClient } from '@/lib/supabase/server';
 
 export interface LoginState {
@@ -15,9 +16,8 @@ const schema = z.object({
 });
 
 function safeNext(value: FormDataEntryValue | null): string {
-  const v = typeof value === 'string' ? value : '';
-  // Tikai iekšējas relatīvas adreses (aizsardzība pret atvērto novirzīšanu)
-  return v.startsWith('/') && !v.startsWith('//') && !v.startsWith('/\\') && !v.startsWith('/login') ? v : '/';
+  const v = safeInternalPath(typeof value === 'string' ? value : '', '/');
+  return v.startsWith('/login') ? '/' : v;
 }
 
 export async function loginAction(_prev: LoginState | undefined, formData: FormData): Promise<LoginState> {

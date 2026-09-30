@@ -227,6 +227,11 @@ test.describe('Trīs pedagogi, viens periods: apkopošana un Excel', () => {
     await page.getByRole('button', { name: 'Atzīmēt kā pasūtītu' }).click();
     await page.getByRole('button', { name: 'Jā, pasūtīts' }).click();
     await expect(page.locator('.badge').filter({ hasText: 'Pasūtīts' }).first()).toBeVisible();
+    // pasūtītam periodam vairs nav pieejamas "iekļaut/pasūtīt/atvērt" pogas (nepieļaujamas pārejas) — tikai arhivēšana
+    await expect(page.getByRole('button', { name: 'Iekļaut pasūtījumā' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Atzīmēt kā pasūtītu' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Atvērt periodu pieteikumiem' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Arhivēt periodu' })).toBeVisible();
     await page.goto(`/pieteikumi?period=${period.id}`);
     await expect(page.getByRole('row').filter({ hasText: `Apkopojums ${stamp}` }).filter({ hasText: 'Pasūtīts' })).toHaveCount(3);
     // pedagogs redz tikai lasāmu skatu
@@ -420,8 +425,9 @@ test.describe('Katalogs, jaunās preces, periodi, lietotāji', () => {
       const r2 = await page.request.get(`/api/products/search?q=${encodeURIComponent(`kemeru sulina ${stamp}`)}`);
       expect(((await r2.json()) as { items: Array<{ name: string }> }).items.map((i) => i.name)).not.toContain(name);
 
-      // imports
-      const csv = ['Preces nosaukums;Mērvienība;Kategorija;Iepakojums;Piezīme', 'Bietes;kg;Augļi un dārzeņi;;jau eksistē', 'Sviests 1×0,25 kg;gab.;Piena produkti;1×0,25 kg;', `E2E Importa prece ${stamp};kg;Sausās preces;500 g;jauna`, 'Slikta rinda;nezināmā vienība;Citi;;', `E2E Importa prece ${stamp};kg;;;dublikāts failā`].join('\n');
+      // imports (līdzīgā prece ar katrai palaišanai unikālu nosaukumu, lai tests būtu atkārtojams uz tās pašas datubāzes)
+      const similar = `Sviests 1×0,${100 + (stamp % 899)} kg`;
+      const csv = ['Preces nosaukums;Mērvienība;Kategorija;Iepakojums;Piezīme', 'Bietes;kg;Augļi un dārzeņi;;jau eksistē', `${similar};gab.;Piena produkti;1×0,25 kg;`, `E2E Importa prece ${stamp};kg;Sausās preces;500 g;jauna`, 'Slikta rinda;nezināmā vienība;Citi;;', `E2E Importa prece ${stamp};kg;;;dublikāts failā`].join('\n');
       const file = path.resolve('e2e/.tmp/import.csv');
       fs.writeFileSync(file, csv, 'utf8');
       await page.goto('/katalogs/imports');
@@ -429,8 +435,8 @@ test.describe('Katalogs, jaunās preces, periodi, lietotāji', () => {
       await page.getByRole('button', { name: 'Nolasīt un parādīt priekšskatījumu' }).click();
       await expect(page.getByRole('heading', { name: /Priekšskatījums/ })).toBeVisible();
       const table = page.getByRole('table', { name: 'Importa priekšskatījums' });
-      await expect(table.getByRole('row').filter({ hasText: 'jau ir katalogā' })).toContainText('Bietes');
-      await expect(table.getByRole('row').filter({ hasText: 'līdzīga prece' })).toContainText('Sviests 1×0,25 kg');
+      await expect(table.getByRole('row').filter({ hasText: 'jau ir katalogā' }).filter({ has: page.getByRole('cell', { name: 'Bietes', exact: true }) })).toHaveCount(1);
+      await expect(table.getByRole('row').filter({ hasText: 'līdzīga prece' }).filter({ hasText: similar })).toHaveCount(1);
       await expect(table.getByRole('row').filter({ hasText: 'Nezināma mērvienība' })).toContainText('Slikta rinda');
       await expect(table.getByRole('row').filter({ hasText: 'dublikāts failā' }).last()).toBeVisible();
       await page.screenshot({ path: 'e2e/.tmp/shots/14-import-preview.png', fullPage: true });
@@ -441,7 +447,7 @@ test.describe('Katalogs, jaunās preces, periodi, lietotāji', () => {
       await page.goto(`/katalogs?q=${encodeURIComponent(`Importa prece ${stamp}`)}`);
       await expect(page.getByRole('row').filter({ hasText: `E2E Importa prece ${stamp}` })).toHaveCount(1);
       await page.goto('/katalogs?q=sviests');
-      await expect(page.getByRole('row').filter({ hasText: 'Sviests 1×0,25 kg' })).toHaveCount(1);
+      await expect(page.getByRole('row').filter({ hasText: similar })).toHaveCount(1);
       await expect(page.getByRole('row').filter({ hasText: 'Sviests 1×0,2 kg' })).toHaveCount(1);
       await expect(page.getByRole('row').filter({ hasText: 'Sviests 1×0,5 kg' })).toHaveCount(1);
     });
@@ -468,28 +474,34 @@ test.describe('Katalogs, jaunās preces, periodi, lietotāji', () => {
 
   test('periodi: administrators izveido periodu, pedagogs to redz redaktorā', async ({ browser }) => {
     const label = `E2E jauns periods ${stamp}`;
+    // unikāli datumi (tālā nākotnē), lai tests būtu atkārtojams uz tās pašas datubāzes
+    const start = new Date(Date.UTC(2040, 0, 1) + (stamp % 5000) * 86400_000);
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const dmy = (d: Date) => `${String(d.getUTCDate()).padStart(2, '0')}.${String(d.getUTCMonth() + 1).padStart(2, '0')}.${d.getUTCFullYear()}.`;
+    const end = new Date(start.getTime() + 4 * 86400_000);
+    const deadline = new Date(start.getTime() - 3 * 86400_000);
     await asUser(browser, USERS.admin.email, async (page) => {
       await page.goto('/periodi');
       await page.locator('#pn-new').fill(label);
-      await page.locator('#ps-new').fill('2031-03-03');
-      await page.locator('#pe-new').fill('2031-03-07');
-      await page.locator('#pd-new').fill('2031-02-28T17:00');
+      await page.locator('#ps-new').fill(iso(start));
+      await page.locator('#pe-new').fill(iso(end));
+      await page.locator('#pd-new').fill(`${iso(deadline)}T17:00`);
       await page.getByRole('button', { name: 'Izveidot periodu' }).click();
       await expect(page.locator('.alert-success')).toContainText('Periods izveidots');
       await expect(page.getByRole('table', { name: 'Periodi' })).toContainText(label);
-      await expect(page.getByRole('table', { name: 'Periodi' }).getByRole('row').filter({ hasText: label })).toContainText('28.02.2031. 17:00');
+      await expect(page.getByRole('table', { name: 'Periodi' }).getByRole('row').filter({ hasText: label })).toContainText(`${dmy(deadline)} 17:00`);
       // nederīgi dati
-      await page.locator('#ps-new').fill('2031-03-09');
-      await page.locator('#pe-new').fill('2031-03-07');
+      await page.locator('#ps-new').fill(iso(new Date(start.getTime() + 9 * 86400_000)));
+      await page.locator('#pe-new').fill(iso(end));
       await page.locator('#pn-new').fill('Nederīgs');
-      await page.locator('#pd-new').fill('2031-02-28T17:00');
+      await page.locator('#pd-new').fill(`${iso(deadline)}T17:00`);
       await page.getByRole('button', { name: 'Izveidot periodu' }).click();
       await expect(page.locator('.alert-error')).toContainText('Beigu datums nedrīkst būt pirms sākuma datuma');
     });
     await asUser(browser, USERS.ilze.email, async (page) => {
       await page.goto('/pieteikumi/jauns');
       await expect(page.locator('#f-period option', { hasText: label })).toHaveCount(1);
-      await page.fill('#f-date', '2031-03-04');
+      await page.fill('#f-date', iso(new Date(start.getTime() + 1 * 86400_000)));
       await expect(page.locator('#f-period option:checked')).toContainText(label);
     });
   });

@@ -54,22 +54,9 @@ export function cleanCell(value: unknown): string {
   return text.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-/** Vienkāršs RFC 4180 CSV parsētājs (pēdiņas, rindu pārtraukumi laukos), norobežotājs tiek noteikts automātiski. */
-export function parseCsv(text: string): string[][] {
-  const t = text.replace(/^﻿/, '');
-  const firstLine = t.split(/\r?\n/, 1)[0] ?? '';
-  const count = (ch: string) => {
-    let n = 0;
-    let inQ = false;
-    for (const c of firstLine) {
-      if (c === '"') inQ = !inQ;
-      else if (!inQ && c === ch) n++;
-    }
-    return n;
-  };
-  const delim = [';', '\t', ','].map((d) => [d, count(d)] as const).sort((a, b) => b[1] - a[1])[0];
-  const sep = delim[1] > 0 ? delim[0] : ',';
-
+/** Vienkāršs RFC 4180 CSV parsētājs (pēdiņas, rindu pārtraukumi laukos) ar norādītu norobežotāju. */
+export function parseCsv(text: string, sep: string): string[][] {
+  const t = text.replace(/^\uFEFF/, '');
   const rows: string[][] = [];
   let row: string[] = [];
   let field = '';
@@ -102,6 +89,18 @@ export function parseCsv(text: string): string[][] {
     rows.push(row);
   }
   return rows;
+}
+
+/**
+ * Norobežotāju nosaka pēc galvenes rindas (nevis pirmās faila rindas — pirms tās var būt virsraksts vai tukšas rindas):
+ * izmēģina ; , un tabulāciju un ņem to, ar kuru tiek atrasta kolonna "Preces nosaukums".
+ */
+export function parseCsvAuto(text: string): { matrix: string[][]; delimiter: string } | null {
+  for (const sep of [';', '\t', ',']) {
+    const matrix = parseCsv(text, sep);
+    if (matrix.some((r) => r.some((c) => HEADERS.name.includes(norm(c))))) return { matrix, delimiter: sep };
+  }
+  return null;
 }
 
 function decodeText(buf: Buffer): string {
@@ -176,7 +175,9 @@ export async function parseImportFile(buffer: Buffer, filename: string): Promise
   }
   if (lower.endsWith('.csv') || lower.endsWith('.txt')) {
     if (isZip || buffer.includes(0)) throw new ImportFileError('Fails nav teksta (CSV) formātā.');
-    return toRows(parseCsv(decodeText(buffer)));
+    const auto = parseCsvAuto(decodeText(buffer));
+    if (!auto) throw new ImportFileError('Failā netika atrasta kolonna «Preces nosaukums». Pārbaudiet galvenes rindu.');
+    return toRows(auto.matrix);
   }
   throw new ImportFileError('Atbalstītie formāti: .xlsx un .csv.');
 }

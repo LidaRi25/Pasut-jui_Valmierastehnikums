@@ -265,11 +265,11 @@ Slepenas atslēgas netiek glabātas pirmkodā; `.env*` faili ir `.gitignore`. Pi
 ## 12. Testēšana
 
 ```bash
-npm test                 # 50 vienībtesti + 46 datubāzes testi (DB testi tiek izlaisti bez TEST_DATABASE_URL)
+npm test                 # 51 vienībtesti + 54 datubāzes testi (DB testi tiek izlaisti bez TEST_DATABASE_URL)
 npm run lint && npm run typecheck && npm run build
 ```
 
-**Datubāzes testi** (`tests/db`, 46 testi) darbojas pret īstu PostgreSQL (RLS, trigeri, funkcijas — ar Supabase saderīgu `auth.uid()`):
+**Datubāzes testi** (`tests/db`, 54 testi) darbojas pret īstu PostgreSQL (RLS, trigeri, funkcijas — ar Supabase saderīgu `auth.uid()`):
 
 ```bash
 bash scripts/local-pg.sh start                      # lokāls PostgreSQL bez Docker (vai izmantojiet savu serveri)
@@ -291,7 +291,7 @@ Testi aptver: (1) summēšana no vairākiem pieteikumiem; (2) dažādi `product_
 datus; (5) administrators redz visus; (6) Excel eksports satur pareizās kopsummas; (7) kopēšana nemaina veco pieteikumu; (8) neaktīvu
 produktu nevar izvēlēties; (9) alias meklēšana; (10) perioda filtrs — un vēl RLS, audita nemaināmību, termiņu, iesniegšanas
 validāciju, apvienošanu, importu, veiktspēju (10 000 produktu, 150 rindu pieteikums), pieejamību (axe-core), mobilo skatu.
-Kopā: 96 vienības/DB testi + 40 e2e testi (38 darbvirsmas + 2 mobilie).
+Kopā: 105 vienības/DB testi + 41 e2e testi (39 darbvirsmas + 2 mobilie).
 
 ## 13. Drošība
 
@@ -308,6 +308,7 @@ Realizēts:
 - Pēdējo sistēmas administratoru nevar deaktivizēt vai pazemināt (datubāzes trigeris).
 
 Nav realizēts: paša veidots pieteikšanās mēģinājumu ierobežojums (tiek izmantoti Supabase Auth rate limits), divfaktoru autentifikācija.
+Zināms `npm audit` brīdinājums (vidējs): tranzitīvā atkarība `uuid` (no `exceljs`) — problēma attiecas uz `uuid` izsaukumiem ar padotu buferi, ko šī lietotne un ExcelJS neizmanto.
 
 ## 14. Pieņēmumi un ierobežojumi
 

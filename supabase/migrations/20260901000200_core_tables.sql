@@ -123,7 +123,9 @@ create table public.products (
   approved_at         timestamptz,
   approved_by         uuid references public.profiles (id) on delete set null,
   updated_at          timestamptz not null default now(),
-  check (merged_into is null or merged_into <> id)
+  check (merged_into is null or merged_into <> id),
+  -- Apvienota (kļūdaini izveidota) prece nedrīkst kļūt atkal aktīva — vēsture paliek neskarta
+  check (merged_into is null or not is_active)
 );
 -- Vienāds normalizētais nosaukums nav atļauts (izņemot apvienotos un noraidītos ierakstus).
 -- "Sviests 1×0,2 kg" un "Sviests 1×0,5 kg" ir dažādi nosaukumi, tāpēc netiek apvienoti.

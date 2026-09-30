@@ -65,7 +65,7 @@ export default async function OrderPage({ searchParams }: { searchParams: Promis
             Iesniegšanas termiņš: <strong style={{ color: 'var(--black)' }}>{formatDateTime(period.submission_deadline)}</strong>
           </p>
           <div className="btn-row">
-            {period.status !== 'open' ? (
+            {['closed', 'collecting'].includes(period.status) ? (
               <form action={periodWorkflowAction}>
                 <input type="hidden" name="period_id" value={period.id} />
                 <input type="hidden" name="op" value="open" />
@@ -74,7 +74,8 @@ export default async function OrderPage({ searchParams }: { searchParams: Promis
                   Atvērt periodu pieteikumiem
                 </button>
               </form>
-            ) : (
+            ) : null}
+            {period.status === 'open' ? (
               <form action={periodWorkflowAction}>
                 <input type="hidden" name="period_id" value={period.id} />
                 <input type="hidden" name="op" value="close" />
@@ -83,23 +84,37 @@ export default async function OrderPage({ searchParams }: { searchParams: Promis
                   Slēgt iesniegšanu
                 </button>
               </form>
-            )}
-            <ConfirmAction
-              action={periodWorkflowAction}
-              label="Iekļaut pasūtījumā"
-              question="Visus iesniegtos un apstiprinātos pieteikumus atzīmēt kā «Iekļauts pasūtījumā»?"
-              confirmLabel="Jā, iekļaut"
-              className="btn btn-sm"
-              hidden={{ period_id: period.id, op: 'include', back }}
-            />
-            <ConfirmAction
-              action={periodWorkflowAction}
-              label="Atzīmēt kā pasūtītu"
-              question="Atzīmēt pieteikumus un periodu kā «Pasūtīts»?"
-              confirmLabel="Jā, pasūtīts"
-              className="btn btn-sm btn-dark"
-              hidden={{ period_id: period.id, op: 'ordered', back }}
-            />
+            ) : null}
+            {['open', 'closed', 'collecting'].includes(period.status) ? (
+              <>
+                <ConfirmAction
+                  action={periodWorkflowAction}
+                  label="Iekļaut pasūtījumā"
+                  question="Visus iesniegtos un apstiprinātos pieteikumus atzīmēt kā «Iekļauts pasūtījumā»?"
+                  confirmLabel="Jā, iekļaut"
+                  className="btn btn-sm"
+                  hidden={{ period_id: period.id, op: 'include', back }}
+                />
+                <ConfirmAction
+                  action={periodWorkflowAction}
+                  label="Atzīmēt kā pasūtītu"
+                  question="Atzīmēt pieteikumus un periodu kā «Pasūtīts»?"
+                  confirmLabel="Jā, pasūtīts"
+                  className="btn btn-sm btn-dark"
+                  hidden={{ period_id: period.id, op: 'ordered', back }}
+                />
+              </>
+            ) : null}
+            {['closed', 'collecting', 'ordered'].includes(period.status) ? (
+              <ConfirmAction
+                action={periodWorkflowAction}
+                label="Arhivēt periodu"
+                question="Arhivēt periodu?"
+                confirmLabel="Jā, arhivēt"
+                className="btn btn-sm"
+                hidden={{ period_id: period.id, op: 'archive', back }}
+              />
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -123,7 +138,8 @@ export default async function OrderPage({ searchParams }: { searchParams: Promis
       <p className="muted" aria-live="polite">
         Pozīcijas: <strong style={{ color: 'var(--black)' }}>{rows.length}</strong>. Apkopošana notiek automātiski pēc preces (product_id) un mērvienības; dažādas mērvienības netiek summētas kopā.
       </p>
-      <SummaryTable rows={rows} query={query} />
+      {/* key: pēc filtru maiņas atvērtās detalizācijas un kešs tiek notīrīti */}
+      <SummaryTable key={query} rows={rows} query={query} />
     </>
   );
 }
