@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createPeriod, login, USERS } from './helpers';
+import { createPeriod, createRequestViaUI, login, service, USERS } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -177,6 +177,77 @@ test.describe('Pedagoga darbplūsma: pieteikuma aizpildīšana', () => {
     await page.waitForTimeout(4500);
     await expect(page).toHaveURL(/\/pieteikumi\/jauns$/);
     await expect(page.getByTestId('save-status')).toContainText('tiks saglabāts automātiski');
+  });
+
+  test('neveiksmīga iesniegšana un atkārtots mēģinājums neveido otru melnrakstu', async ({ page }) => {
+    const p2 = await createPeriod(`E2E retry ${Date.now()}`);
+    const p3 = await createPeriod(`E2E retry-2 ${Date.now()}`);
+    await login(page, USERS.ilze.email);
+    await page.goto('/pieteikumi/jauns');
+    const topic = `Atkārtota iesniegšana ${Date.now()}`;
+    await page.fill('#f-topic', topic);
+    await page.fill('#f-date', p2.date);
+    const v2 = await page.locator('#f-period option', { hasText: p2.name }).first().getAttribute('value');
+    await page.locator('#f-period').selectOption(v2 as string);
+    const row = page.getByTestId('item-row').nth(0);
+    await row.getByRole('combobox', { name: /^Prece/ }).fill('burkani');
+    await page.getByRole('listbox').getByRole('option', { name: /^Burkāni/ }).click();
+    await row.getByLabel(/^Daudzums/).fill('2');
+    // periods tiek slēgts tieši pirms iesniegšanas
+    await service().from('order_periods').update({ status: 'closed' }).eq('id', p2.id);
+    await page.getByTestId('submit-request').click();
+    await expect(page.getByTestId('error-summary')).toContainText('slēgts vai iesniegšanas termiņš ir beidzies');
+    // izvēlamies citu periodu un iesniedzam vēlreiz
+    const v3 = await page.locator('#f-period option', { hasText: p3.name }).first().getAttribute('value');
+    await page.locator('#f-period').selectOption(v3 as string);
+    await page.getByTestId('submit-request').click();
+    await page.waitForURL(/ok=submitted/);
+    await page.goto('/pieteikumi?status=');
+    await expect(page.getByRole('row').filter({ hasText: topic })).toHaveCount(1); // nevis 2
+  });
+
+  test('iesniegta pieteikuma labošana tiek validēta: tukšu tēmu un rindu izdzēšanu nevar saglabāt', async ({ page }) => {
+    const p = await createPeriod(`E2E labošana ${Date.now()}`);
+    await login(page, USERS.sanita.email);
+    const id = await createRequestViaUI(page, {
+      topic: `Labojamais ${Date.now()}`, date: p.date, periodName: p.name,
+      items: [{ search: 'kabaci', pick: /^Kabači/, qty: '3' }],
+    });
+    await page.goto(`/pieteikumi/${id}`);
+    const topic = await page.locator('#f-topic').inputValue();
+    await page.fill('#f-topic', '   ');
+    await page.getByTestId('save-changes').click();
+    await expect(page.getByTestId('save-status')).toContainText('Norādiet praktiskās nodarbības tēmu');
+    await page.fill('#f-topic', topic);
+    // izdzēšam vienīgo rindu -> tukša rinda; saglabājot serveris noraida (nav preču)
+    await page.getByRole('button', { name: /^Dzēst 1\. rindu/ }).click();
+    await page.getByTestId('save-changes').click();
+    await expect(page.getByTestId('save-status')).toContainText('Pievienojiet vismaz vienu preci');
+    await page.reload();
+    await expect(page.getByTestId('item-row')).toHaveCount(1);
+    await expect(page.getByTestId('item-row').nth(0).getByRole('combobox', { name: /^Prece/ })).toHaveValue('Kabači');
+  });
+
+  test('vienu pieteikumu atverot divos logos, otrs saglabājums neuzraksta pāri klusi (konflikta atklāšana)', async ({ browser }) => {
+    const ctx = await browser.newContext({ locale: 'lv-LV', viewport: { width: 1360, height: 900 } });
+    const a = await ctx.newPage();
+    await login(a, USERS.ilze.email);
+    await a.goto('/pieteikumi/jauns');
+    await a.fill('#f-topic', `Konflikts ${Date.now()}`);
+    await a.getByTestId('save-draft').click();
+    await expect(a.getByTestId('save-status')).toContainText('saglabāts');
+    const url = a.url();
+    const b = await ctx.newPage();
+    await b.goto(url);
+    await a.fill('#f-notes', 'no loga A');
+    await a.getByTestId('save-draft').click();
+    await expect(a.getByTestId('save-status')).toContainText('saglabāts');
+    await b.fill('#f-notes', 'no loga B');
+    await b.getByTestId('save-draft').click();
+    await expect(b.getByTestId('save-status')).toContainText('starplaikā ir mainīts');
+    await b.reload();
+    await expect(b.locator('#f-notes')).toHaveValue('no loga A'); // A izmaiņas nav pazudušas
+    await ctx.close();
   });
 
   test('jaunas preces ierosināšana pieteikuma rindā: prece uzreiz izmantojama, atzīmēta kā neapstiprināta', async ({ page }) => {

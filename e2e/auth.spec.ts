@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { login, logout, USERS, PASSWORD } from './helpers';
+import { login, logout, service, USERS, PASSWORD } from './helpers';
 
 test.describe('Autentifikācija un lomas', () => {
   test('nepieteikts lietotājs tiek novirzīts uz pieteikšanās lapu (visas lapas un API ir slēgtas)', async ({ page, request }) => {
@@ -36,6 +36,22 @@ test.describe('Autentifikācija un lomas', () => {
     await logout(page);
     await page.goto('/pieteikumi');
     await expect(page).toHaveURL(/\/login/);
+  });
+
+  test('derīga Auth sesija bez profila neizraisa nebeidzamu novirzīšanu — sesija tiek beigta ar saprotamu paziņojumu', async ({ page }) => {
+    const sb = service();
+    const email = `bez-profila.${Date.now()}@vt.test`;
+    const { data, error } = await sb.auth.admin.createUser({ email, password: PASSWORD, email_confirm: true });
+    expect(error).toBeNull();
+    await sb.from('profiles').delete().eq('id', data.user!.id); // profils (un loma) trūkst
+    await page.goto('/login');
+    await page.fill('#email', email);
+    await page.fill('#password', PASSWORD);
+    await page.click('button[type=submit]');
+    await expect(page).toHaveURL(/\/login\?error=inactive/);
+    await expect(page.locator('.alert-error')).toContainText('deaktivizēts');
+    await page.goto('/');
+    await expect(page).toHaveURL(/\/login/); // sesija beigta, nav cikla
   });
 
   test('pedagogs redz tikai pedagoga izvēlni un nevar atvērt administratora lapas (server-side pārbaude)', async ({ page, request }) => {

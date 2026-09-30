@@ -6,7 +6,8 @@ import { cookieSecure } from '@/lib/env';
 // Svarīgi: šī ir tikai pirmā aizsardzības līnija. Katra lapa, Server Action un API ceļš atkārtoti pārbauda
 // lomu serverī (src/lib/auth.ts), un datus galīgi aizsargā Row Level Security datubāzē.
 
-const PUBLIC_PATHS = new Set(['/login', '/api/health']);
+// /auth/inactive tikai beidz sesiju un novirza uz pieteikšanos (idempotents; jābūt pieejamam arī pēc sesijas beigšanas)
+const PUBLIC_PATHS = new Set(['/login', '/api/health', '/auth/inactive']);
 
 function buildCsp(nonce: string): string {
   const isDev = process.env.NODE_ENV === 'development';

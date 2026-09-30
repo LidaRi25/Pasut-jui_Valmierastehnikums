@@ -75,6 +75,44 @@ describe.skipIf(!dbAvailable())('Pieteikumu noteikumi (DB)', () => {
     await expectDbError(db.saveRequest(s.teacherB, { ...base(), period_id: period }, [{ product: 'Bietes', quantity: '1' }]), 'VT_PERIOD_CLOSED');
   });
 
+  it('iesniegts pieteikums tiek atkārtoti validēts arī pēc labošanas (tēma, datums, rindas, daudzumi)', async () => {
+    const id = await db.saveRequest(s.teacherA, base(), [{ product: 'Bietes', quantity: '1' }, { product: 'Burkāni', quantity: '2' }], { submit: true });
+    const state = async () => (await db.admin(`select topic, lesson_date::text as d, (select count(*)::int from public.request_items where request_id = $1) as n from public.requests where id = $1`, [id])).rows[0];
+    const before = await state();
+    const save = (data: Record<string, unknown>, items: unknown) =>
+      db.as(s.teacherA, `select public.save_request($1, $2::jsonb, $3::jsonb)`, [id, JSON.stringify({ ...base(), ...data }), items === undefined ? null : JSON.stringify(items)]);
+    await expectDbError(save({ topic: '   ' }, undefined), 'VT_SUBMIT_INVALID', 'NO_TOPIC');
+    await expectDbError(save({ lesson_date: null }, undefined), 'VT_SUBMIT_INVALID', 'NO_DATE');
+    await expectDbError(save({ period_id: null }, undefined), 'VT_SUBMIT_INVALID', 'NO_PERIOD');
+    // visu rindu izdzēšana (atomāri — viss tiek atritināts atpakaļ)
+    await expectDbError(save({}, []), 'VT_SUBMIT_INVALID', 'NO_ITEMS');
+    // tieša piekļuve (kā PATCH caur PostgREST) arī nedrīkst apiet validāciju
+    await expectDbError(db.as(s.teacherA, `update public.requests set topic = '' where id = $1`, [id]), 'VT_SUBMIT_INVALID', 'NO_TOPIC');
+    await expectDbError(db.as(s.teacherA, `delete from public.request_items where request_id = $1`, [id]), 'VT_SUBMIT_INVALID', 'NO_ITEMS');
+    await expectDbError(db.as(s.admin, `delete from public.request_items where request_id = $1`, [id]), 'VT_SUBMIT_INVALID', 'NO_ITEMS');
+    await expect(db.as(s.teacherA, `update public.request_items set quantity = 0 where request_id = $1`, [id])).rejects.toThrow(/check constraint|request_items_quantity_check/);
+    await expectDbError(db.as(s.teacherA, `update public.request_items set quantity = null where request_id = $1`, [id]), 'VT_BAD_QTY');
+    expect(await state()).toEqual(before);
+    // derīgs labojums izdodas; viena rinda ir pietiekami
+    await save({ topic: 'Labota tēma' }, [{ id: (await db.admin(`select id from public.request_items where request_id = $1 order by position limit 1`, [id])).rows[0].id, product_id: await db.product('Bietes'), unit_id: await db.unit('kg'), quantity: '4' }]);
+    expect((await state()).n).toBe(1);
+  });
+
+  it('save_request: NULL rindu saraksts neaiztiek rindas; optimistiskā bloķēšana atklāj konfliktu', async () => {
+    const id = await db.saveRequest(s.teacherA, base(), [{ product: 'Bietes', quantity: '1' }, { product: 'Kabači', quantity: '2' }]);
+    // p_items = NULL: rindas paliek
+    await db.as(s.teacherA, `select public.save_request($1, $2::jsonb, null)`, [id, JSON.stringify({ ...base(), notes: 'tikai galvene' })]);
+    expect((await db.admin(`select count(*)::int as n from public.request_items where request_id = $1`, [id])).rows[0].n).toBe(2);
+    // divi logi: A saglabā, B mēģina saglabāt ar novecojušu versiju
+    const cur = (await db.as(s.teacherA, `select public.save_request($1, $2::jsonb, null) as r`, [id, JSON.stringify({ ...base() })])).rows[0].r.updated_at as string;
+    await db.as(s.teacherA, `select public.save_request($1, $2::jsonb, null)`, [id, JSON.stringify({ ...base(), notes: 'ar pareizo versiju', expected_updated_at: cur })]);
+    await expectDbError(
+      db.as(s.teacherA, `select public.save_request($1, $2::jsonb, null)`, [id, JSON.stringify({ ...base(), notes: 'novecojis', expected_updated_at: cur })]),
+      'VT_CONFLICT',
+    );
+    expect((await db.admin(`select notes from public.requests where id = $1`, [id])).rows[0].notes).toBe('ar pareizo versiju');
+  });
+
   it('7) pieteikuma kopēšana izveido jaunu melnrakstu un NEMAINA veco ierakstu', async () => {
     const orig = await db.saveRequest(
       s.teacherA,

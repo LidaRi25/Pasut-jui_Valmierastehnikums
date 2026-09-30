@@ -87,7 +87,10 @@ Galvenie arhitektūras lēmumi:
 - **Meklēšana serverī** (`search_products`): normalizēts nosaukums (mazie burti, latviešu diakritika, `×`→`x`, `0,5`≡`0.5`),
   trigrammu GIN indeksi, ranžēšana (precīza sakritība → sākas ar → vārda sākums → satur → sinonīms → drukas kļūdas).
   Pārlūkā netiek ielādēts viss katalogs; 10 000 produktu katalogā atbilde ir ~50–150 ms.
-- **Autosave** izmanto vienu atomāru RPC `save_request` (rindu kopa tiek sinhronizēta vienā transakcijā).
+- **Autosave** izmanto vienu atomāru RPC `save_request` (rindu kopa tiek sinhronizēta vienā transakcijā) ar **optimistisko bloķēšanu**
+  (`expected_updated_at`): ja pieteikums starplaikā mainīts citā logā vai ar citu lietotāju, saglabāšana tiek noraidīta ar saprotamu paziņojumu,
+  nevis klusi pārrakstīta. Iesniegta pieteikuma obligātie lauki (tēma, datums, periods, vismaz viena rinda ar daudzumu > 0) tiek pārbaudīti
+  **arī pēc katras turpmākās labošanas** (datubāzes trigeri; nav apejami ar tiešu API pieprasījumu).
 - **Decimālskaitļi**: datubāzē `numeric(14,3)`; JavaScript pusē tekstu/BigInt aritmētika (`src/lib/decimal.ts`) — pieņem `0,5` un
   `0.5`, attēlo latviski (`0,5 kg`, `4,0`).
 
@@ -262,11 +265,11 @@ Slepenas atslēgas netiek glabātas pirmkodā; `.env*` faili ir `.gitignore`. Pi
 ## 12. Testēšana
 
 ```bash
-npm test                 # vienībtesti + datubāzes testi (DB testi tiek izlaisti bez TEST_DATABASE_URL)
+npm test                 # 50 vienībtesti + 46 datubāzes testi (DB testi tiek izlaisti bez TEST_DATABASE_URL)
 npm run lint && npm run typecheck && npm run build
 ```
 
-**Datubāzes testi** (`tests/db`, 45 testi) darbojas pret īstu PostgreSQL (RLS, trigeri, funkcijas — ar Supabase saderīgu `auth.uid()`):
+**Datubāzes testi** (`tests/db`, 46 testi) darbojas pret īstu PostgreSQL (RLS, trigeri, funkcijas — ar Supabase saderīgu `auth.uid()`):
 
 ```bash
 bash scripts/local-pg.sh start                      # lokāls PostgreSQL bez Docker (vai izmantojiet savu serveri)
@@ -288,6 +291,7 @@ Testi aptver: (1) summēšana no vairākiem pieteikumiem; (2) dažādi `product_
 datus; (5) administrators redz visus; (6) Excel eksports satur pareizās kopsummas; (7) kopēšana nemaina veco pieteikumu; (8) neaktīvu
 produktu nevar izvēlēties; (9) alias meklēšana; (10) perioda filtrs — un vēl RLS, audita nemaināmību, termiņu, iesniegšanas
 validāciju, apvienošanu, importu, veiktspēju (10 000 produktu, 150 rindu pieteikums), pieejamību (axe-core), mobilo skatu.
+Kopā: 96 vienības/DB testi + 40 e2e testi (38 darbvirsmas + 2 mobilie).
 
 ## 13. Drošība
 

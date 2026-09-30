@@ -28,6 +28,7 @@ const CODE_MESSAGE: Record<string, string> = {
   VT_ALREADY_RESOLVED: 'Šis ierosinājums jau ir izskatīts.',
   VT_LAST_SYSADMIN: 'Nevar noņemt vai deaktivizēt pēdējo sistēmas administratoru.',
   VT_INVALID: 'Ievadītie dati nav derīgi.',
+  VT_CONFLICT: 'Pieteikums starplaikā ir mainīts (citā logā vai ar citu lietotāju). Atsvaidziniet lapu, lai redzētu jaunāko versiju.',
   VT_BAD_QTY: 'Daudzumam jābūt lielākam par 0.',
   VT_AUDIT_IMMUTABLE: 'Audita vēsturi nedrīkst mainīt.',
 };
@@ -47,9 +48,9 @@ export function dbErrorMessage(error: DbErrorLike | null | undefined): string {
       ? `Šāds nosaukums jau ir sinonīms precei «${error.details}». Izmantojiet to.`
       : 'Šāds nosaukums jau ir sinonīms esošai precei.';
   }
-  for (const [code, text] of Object.entries(CODE_MESSAGE)) {
-    if (message.includes(code)) return text;
-  }
+  // Precīza koda izgūšana (VT_FORBIDDEN nedrīkst "nosegt" VT_FORBIDDEN_STATUS)
+  const code = /VT_[A-Z_]+/.exec(message)?.[0];
+  if (code && CODE_MESSAGE[code]) return CODE_MESSAGE[code];
   switch (error.code) {
     case '23505':
       return 'Šāds ieraksts jau eksistē.';

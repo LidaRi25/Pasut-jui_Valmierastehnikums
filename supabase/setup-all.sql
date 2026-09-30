@@ -781,6 +781,7 @@ declare
   v_errors text[] := '{}';
   v_items integer;
   v_bad integer;
+  v_leaving_draft boolean := false;
 begin
   -- Ierobežojumi pedagogiem (administratora un sistēmas darbībām tie neattiecas)
   if v_uid is not null and not v_admin then
@@ -810,8 +811,10 @@ begin
     end if;
   end if;
 
-  -- Iesniegšanas validācija: melnraksts -> iesniegts (vai tālāk)
-  if tg_op = 'UPDATE' and old.status = 'draft' and new.status not in ('draft', 'cancelled') then
+  -- Aktīva pieteikuma (nav melnraksts / atcelts) obligātie lauki jābūt aizpildītiem ne tikai iesniedzot,
+  -- bet arī pēc jebkuras turpmākas labošanas (arī tiešā PATCH pieprasījumā).
+  if tg_op = 'UPDATE' and new.status not in ('draft', 'cancelled') then
+    v_leaving_draft := old.status = 'draft';
     if btrim(coalesce(new.topic, '')) = '' then
       v_errors := array_append(v_errors, 'NO_TOPIC');
     end if;
@@ -820,27 +823,31 @@ begin
     end if;
     if new.period_id is null then
       v_errors := array_append(v_errors, 'NO_PERIOD');
-    elsif v_uid is not null and not v_admin then
+    elsif v_leaving_draft and v_uid is not null and not v_admin then
       select * into v_period from public.order_periods where id = new.period_id;
       if v_period.status <> 'open' or now() > v_period.submission_deadline then
         v_errors := array_append(v_errors, 'PERIOD_CLOSED');
       end if;
     end if;
-    select count(*), count(*) filter (where quantity is null or quantity <= 0)
-      into v_items, v_bad
-    from public.request_items where request_id = new.id;
-    if v_items = 0 then
-      v_errors := array_append(v_errors, 'NO_ITEMS');
-    elsif v_bad > 0 then
-      v_errors := array_append(v_errors, 'BAD_QTY');
+    if v_leaving_draft then
+      select count(*), count(*) filter (where quantity is null or quantity <= 0)
+        into v_items, v_bad
+      from public.request_items where request_id = new.id;
+      if v_items = 0 then
+        v_errors := array_append(v_errors, 'NO_ITEMS');
+      elsif v_bad > 0 then
+        v_errors := array_append(v_errors, 'BAD_QTY');
+      end if;
     end if;
     if array_length(v_errors, 1) > 0 then
       raise exception 'VT_SUBMIT_INVALID' using detail = array_to_string(v_errors, ',');
     end if;
-    if new.status = 'submitted' then
-      new.submitted_at := now();
-    else
-      new.submitted_at := coalesce(new.submitted_at, now());
+    if v_leaving_draft then
+      if new.status = 'submitted' then
+        new.submitted_at := now();
+      else
+        new.submitted_at := coalesce(new.submitted_at, now());
+      end if;
     end if;
   end if;
 
@@ -889,6 +896,41 @@ $$;
 create trigger request_items_before_write
   before insert or update on public.request_items
   for each row execute function public.request_items_guard();
+
+-- Aktīva (nav melnraksts / atcelts) pieteikuma rindu kopa nedrīkst kļūt nederīga: jābūt vismaz vienai rindai un visiem daudzumiem > 0.
+-- Pārbaude ir atlikta līdz transakcijas beigām, lai atomāra rindu sinhronizācija (save_request) varētu pagaidu stāvoklī dzēst/pievienot rindas.
+create or replace function public.request_items_final_check()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_rid uuid := coalesce(new.request_id, old.request_id);
+  v_status public.request_status;
+  v_count integer;
+  v_bad integer;
+begin
+  select status into v_status from public.requests where id = v_rid;
+  if not found or v_status in ('draft', 'cancelled') then
+    return null;
+  end if;
+  select count(*), count(*) filter (where quantity is null or quantity <= 0)
+    into v_count, v_bad
+  from public.request_items where request_id = v_rid;
+  if v_count = 0 then
+    raise exception 'VT_SUBMIT_INVALID' using detail = 'NO_ITEMS';
+  elsif v_bad > 0 then
+    raise exception 'VT_SUBMIT_INVALID' using detail = 'BAD_QTY';
+  end if;
+  return null;
+end;
+$$;
+
+create constraint trigger request_items_final_check
+  after insert or update or delete on public.request_items
+  deferrable initially deferred
+  for each row execute function public.request_items_final_check();
 
 -- >>>>>>>>>> migrācija: 20260901000400_row_level_security.sql
 -- =============================================================================
@@ -1246,9 +1288,11 @@ as $$
 $$;
 
 -- ---------- Pieteikuma saglabāšana (atomāri) --------------------------------------------------------------------------------------------
--- p_data:  { period_id, course_id, group_id, students, topic, lesson_date, student_count, notes }
+-- p_data:  { period_id, course_id, group_id, students, topic, lesson_date, student_count, notes, expected_updated_at? }
 -- p_items: [ { id?, product_id, unit_id, quantity (teksts vai null), notes } ]  — masīva secība = Npk.
+--          NULL = rindas netiek aiztiktas; masīvs = pilna rindu kopa (trūkstošās rindas tiek dzēstas).
 -- Rindas bez product_id netiek saglabātas (tās paliek tikai lietotāja formā).
+-- expected_updated_at: optimistiskā bloķēšana — ja pieteikums starplaikā mainīts (cits logs / cits lietotājs), tiek atgriezts VT_CONFLICT.
 
 create or replace function public.save_request(p_id uuid, p_data jsonb, p_items jsonb)
 returns jsonb
@@ -1262,6 +1306,7 @@ declare
   v_item jsonb;
   v_item_id uuid;
   v_ids uuid[] := '{}';
+  v_current timestamptz;
 begin
   if p_data is null or jsonb_typeof(p_data) <> 'object' then
     raise exception 'VT_INVALID';
@@ -1286,6 +1331,12 @@ begin
     returning * into v_row;
     v_id := v_row.id;
   else
+    if nullif(p_data ->> 'expected_updated_at', '') is not null then
+      select updated_at into v_current from public.requests where id = v_id for update;
+      if found and v_current <> (p_data ->> 'expected_updated_at')::timestamptz then
+        raise exception 'VT_CONFLICT';
+      end if;
+    end if;
     update public.requests set
       period_id = nullif(p_data ->> 'period_id', '')::uuid,
       course_id = nullif(p_data ->> 'course_id', '')::uuid,
@@ -1305,34 +1356,36 @@ begin
     end if;
   end if;
 
-  for v_item in select * from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) loop
-    if nullif(v_item ->> 'product_id', '') is null then
-      continue;
-    end if;
-    v_pos := v_pos + 1;
-    v_item_id := coalesce(nullif(v_item ->> 'id', '')::uuid, gen_random_uuid());
-    if exists (select 1 from public.request_items where id = v_item_id and request_id = v_id) then
-      update public.request_items set
-        position = v_pos,
-        product_id = (v_item ->> 'product_id')::uuid,
-        quantity = nullif(v_item ->> 'quantity', '')::numeric,
-        unit_id = (v_item ->> 'unit_id')::uuid,
-        notes = nullif(btrim(v_item ->> 'notes'), '')
-      where id = v_item_id;
-    else
-      insert into public.request_items (id, request_id, position, product_id, quantity, unit_id, notes)
-      values (
-        v_item_id, v_id, v_pos,
-        (v_item ->> 'product_id')::uuid,
-        nullif(v_item ->> 'quantity', '')::numeric,
-        (v_item ->> 'unit_id')::uuid,
-        nullif(btrim(v_item ->> 'notes'), '')
-      );
-    end if;
-    v_ids := v_ids || v_item_id;
-  end loop;
+  if p_items is not null then
+    for v_item in select * from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) loop
+      if nullif(v_item ->> 'product_id', '') is null then
+        continue;
+      end if;
+      v_pos := v_pos + 1;
+      v_item_id := coalesce(nullif(v_item ->> 'id', '')::uuid, gen_random_uuid());
+      if exists (select 1 from public.request_items where id = v_item_id and request_id = v_id) then
+        update public.request_items set
+          position = v_pos,
+          product_id = (v_item ->> 'product_id')::uuid,
+          quantity = nullif(v_item ->> 'quantity', '')::numeric,
+          unit_id = (v_item ->> 'unit_id')::uuid,
+          notes = nullif(btrim(v_item ->> 'notes'), '')
+        where id = v_item_id;
+      else
+        insert into public.request_items (id, request_id, position, product_id, quantity, unit_id, notes)
+        values (
+          v_item_id, v_id, v_pos,
+          (v_item ->> 'product_id')::uuid,
+          nullif(v_item ->> 'quantity', '')::numeric,
+          (v_item ->> 'unit_id')::uuid,
+          nullif(btrim(v_item ->> 'notes'), '')
+        );
+      end if;
+      v_ids := v_ids || v_item_id;
+    end loop;
 
-  delete from public.request_items where request_id = v_id and id <> all (v_ids);
+    delete from public.request_items where request_id = v_id and id <> all (v_ids);
+  end if;
 
   select * into v_row from public.requests where id = v_id;
   return jsonb_build_object(

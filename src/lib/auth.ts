@@ -20,12 +20,18 @@ export const getSession = cache(async (): Promise<SessionState> => {
   if (error || !data.user) return { status: 'anonymous' };
   const uid = data.user.id;
 
-  const [{ data: profile }, { data: roleRow }] = await Promise.all([
+  const [{ data: profile, error: profileError }, { data: roleRow, error: roleError }] = await Promise.all([
     supabase.from('profiles').select('id, email, full_name, is_active').eq('id', uid).maybeSingle(),
     supabase.from('user_roles').select('role').eq('user_id', uid).maybeSingle(),
   ]);
-  if (!profile || !roleRow) return { status: 'anonymous' };
-  if (!profile.is_active) return { status: 'inactive' };
+  // Īslaicīga datubāzes kļūda nav "nav pieteicies": rādām kļūdas lapu, nevis raidām lietotāju ciklā starp /login un /
+  if (profileError || roleError) {
+    console.error('[session]', profileError?.code ?? roleError?.code, profileError?.message ?? roleError?.message);
+    throw new Error('Neizdevās ielādēt lietotāja profilu.');
+  }
+  // Derīga Auth sesija, bet nav profila/lomas (piem., konts izveidots pirms trigera) — kā deaktivizēts konts:
+  // /auth/inactive beidz sesiju un parāda saprotamu paziņojumu (citādi /login ↔ / nebeidzama novirzīšana)
+  if (!profile || !roleRow || !profile.is_active) return { status: 'inactive' };
   return {
     status: 'ok',
     user: {

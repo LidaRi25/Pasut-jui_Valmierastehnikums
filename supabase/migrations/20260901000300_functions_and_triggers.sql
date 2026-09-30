@@ -483,6 +483,7 @@ declare
   v_errors text[] := '{}';
   v_items integer;
   v_bad integer;
+  v_leaving_draft boolean := false;
 begin
   -- Ierobežojumi pedagogiem (administratora un sistēmas darbībām tie neattiecas)
   if v_uid is not null and not v_admin then
@@ -512,8 +513,10 @@ begin
     end if;
   end if;
 
-  -- Iesniegšanas validācija: melnraksts -> iesniegts (vai tālāk)
-  if tg_op = 'UPDATE' and old.status = 'draft' and new.status not in ('draft', 'cancelled') then
+  -- Aktīva pieteikuma (nav melnraksts / atcelts) obligātie lauki jābūt aizpildītiem ne tikai iesniedzot,
+  -- bet arī pēc jebkuras turpmākas labošanas (arī tiešā PATCH pieprasījumā).
+  if tg_op = 'UPDATE' and new.status not in ('draft', 'cancelled') then
+    v_leaving_draft := old.status = 'draft';
     if btrim(coalesce(new.topic, '')) = '' then
       v_errors := array_append(v_errors, 'NO_TOPIC');
     end if;
@@ -522,27 +525,31 @@ begin
     end if;
     if new.period_id is null then
       v_errors := array_append(v_errors, 'NO_PERIOD');
-    elsif v_uid is not null and not v_admin then
+    elsif v_leaving_draft and v_uid is not null and not v_admin then
       select * into v_period from public.order_periods where id = new.period_id;
       if v_period.status <> 'open' or now() > v_period.submission_deadline then
         v_errors := array_append(v_errors, 'PERIOD_CLOSED');
       end if;
     end if;
-    select count(*), count(*) filter (where quantity is null or quantity <= 0)
-      into v_items, v_bad
-    from public.request_items where request_id = new.id;
-    if v_items = 0 then
-      v_errors := array_append(v_errors, 'NO_ITEMS');
-    elsif v_bad > 0 then
-      v_errors := array_append(v_errors, 'BAD_QTY');
+    if v_leaving_draft then
+      select count(*), count(*) filter (where quantity is null or quantity <= 0)
+        into v_items, v_bad
+      from public.request_items where request_id = new.id;
+      if v_items = 0 then
+        v_errors := array_append(v_errors, 'NO_ITEMS');
+      elsif v_bad > 0 then
+        v_errors := array_append(v_errors, 'BAD_QTY');
+      end if;
     end if;
     if array_length(v_errors, 1) > 0 then
       raise exception 'VT_SUBMIT_INVALID' using detail = array_to_string(v_errors, ',');
     end if;
-    if new.status = 'submitted' then
-      new.submitted_at := now();
-    else
-      new.submitted_at := coalesce(new.submitted_at, now());
+    if v_leaving_draft then
+      if new.status = 'submitted' then
+        new.submitted_at := now();
+      else
+        new.submitted_at := coalesce(new.submitted_at, now());
+      end if;
     end if;
   end if;
 
@@ -591,3 +598,38 @@ $$;
 create trigger request_items_before_write
   before insert or update on public.request_items
   for each row execute function public.request_items_guard();
+
+-- Aktīva (nav melnraksts / atcelts) pieteikuma rindu kopa nedrīkst kļūt nederīga: jābūt vismaz vienai rindai un visiem daudzumiem > 0.
+-- Pārbaude ir atlikta līdz transakcijas beigām, lai atomāra rindu sinhronizācija (save_request) varētu pagaidu stāvoklī dzēst/pievienot rindas.
+create or replace function public.request_items_final_check()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_rid uuid := coalesce(new.request_id, old.request_id);
+  v_status public.request_status;
+  v_count integer;
+  v_bad integer;
+begin
+  select status into v_status from public.requests where id = v_rid;
+  if not found or v_status in ('draft', 'cancelled') then
+    return null;
+  end if;
+  select count(*), count(*) filter (where quantity is null or quantity <= 0)
+    into v_count, v_bad
+  from public.request_items where request_id = v_rid;
+  if v_count = 0 then
+    raise exception 'VT_SUBMIT_INVALID' using detail = 'NO_ITEMS';
+  elsif v_bad > 0 then
+    raise exception 'VT_SUBMIT_INVALID' using detail = 'BAD_QTY';
+  end if;
+  return null;
+end;
+$$;
+
+create constraint trigger request_items_final_check
+  after insert or update or delete on public.request_items
+  deferrable initially deferred
+  for each row execute function public.request_items_final_check();

@@ -25,6 +25,8 @@ const dataSchema = z.object({
     .nullable(),
   student_count: z.number().int().min(0).max(10000).nullable(),
   notes: z.string().max(2000),
+  // Optimistiskā bloķēšana: pēdējā zināmā pieteikuma versija (updated_at, teksts)
+  expected_updated_at: z.string().max(64).nullable().optional(),
 });
 
 const itemSchema = z.object({
@@ -72,8 +74,8 @@ export async function submitRequestAction(input: unknown): Promise<SaveResult> {
   const supabase = await createClient();
   const { error } = await supabase.rpc('submit_request', { p_id: saved.id });
   if (error && !(error.message ?? '').includes('VT_ALREADY_SUBMITTED')) return fail(error);
-  revalidatePath('/pieteikumi');
-  revalidatePath('/');
+  // Bez revalidatePath: klients pēc veiksmes pāriet uz pieteikuma lapu (dinamiska, vienmēr svaiga); revalidācija
+  // pārrenderētu pašreizējo maršrutu un uz mirkli nodzēstu formu.
   return saved;
 }
 

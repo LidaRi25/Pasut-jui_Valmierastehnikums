@@ -24,6 +24,7 @@ export default async function NewRequestPage() {
           id: null,
           requestNo: null,
           requestNoLabel: '',
+          updatedAt: null,
           status: 'draft',
           teacherName: user.fullName,
           header: {

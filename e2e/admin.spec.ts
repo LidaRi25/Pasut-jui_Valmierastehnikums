@@ -545,6 +545,53 @@ test.describe('Katalogs, jaunās preces, periodi, lietotāji', () => {
     await ctx2.close();
   });
 
+  test('papildu piekļuve: piešķirtais pedagogs sarakstā redz cita pedagoga pieteikumus (skatīt / labot)', async ({ browser }) => {
+    const sb = service();
+    const [owner, grantee] = await Promise.all([
+      sb.from('profiles').select('id').eq('email', USERS.sanita.email).single(),
+      sb.from('profiles').select('id').eq('email', USERS.janis.email).single(),
+    ]);
+    const p = await createPeriod(`E2E piekļuve ${stamp}`);
+    let requestId = '';
+    await asUser(browser, USERS.sanita.email, async (page) => {
+      requestId = await createRequestViaUI(page, { topic: `Koplietots ${stamp}`, date: p.date, periodName: p.name, items: [{ search: 'kabaci', pick: /^Kabači/, qty: '1' }] });
+    });
+    await asUser(browser, USERS.janis.email, async (page) => {
+      await page.goto('/pieteikumi');
+      await expect(page.getByRole('row').filter({ hasText: `Koplietots ${stamp}` })).toHaveCount(0); // bez piekļuves — neredz
+    });
+    // sistēmas administrators piešķir tikai skatīšanos
+    await asUser(browser, USERS.sysadmin.email, async (page) => {
+      await page.goto('/lietotaji');
+      await page.locator('#g-grantee').selectOption(grantee.data!.id);
+      await page.locator('#g-owner').selectOption(owner.data!.id);
+      await page.getByRole('button', { name: 'Piešķirt piekļuvi' }).click();
+      await expect(page.locator('.alert-success', { hasText: 'Piekļuve piešķirta' })).toBeVisible();
+    });
+    await asUser(browser, USERS.janis.email, async (page) => {
+      await page.goto('/pieteikumi');
+      const row = page.getByRole('row').filter({ hasText: `Koplietots ${stamp}` });
+      await expect(row).toHaveCount(1);
+      await expect(row).toContainText('Sanita Reinfelde'); // "Pedagogs" kolonna parādās
+      await page.goto(`/pieteikumi/${requestId}`);
+      await expect(page.getByTestId('request-view')).toBeVisible(); // tikai skatīšanās
+    });
+    await sb.from('teacher_access_grants').update({ can_edit: true }).eq('owner_id', owner.data!.id).eq('grantee_id', grantee.data!.id);
+    await asUser(browser, USERS.janis.email, async (page) => {
+      await page.goto(`/pieteikumi/${requestId}`);
+      await expect(page.getByTestId('request-editor')).toBeVisible();
+    });
+    await asUser(browser, USERS.sysadmin.email, async (page) => {
+      await page.goto('/lietotaji');
+      await page.getByRole('button', { name: 'Noņemt', exact: true }).first().click();
+      await page.getByRole('button', { name: 'Jā, noņemt' }).click();
+    });
+    await asUser(browser, USERS.janis.email, async (page) => {
+      await page.goto(`/pieteikumi/${requestId}`);
+      await expect(page.getByRole('heading', { name: 'Lapa nav atrasta' })).toBeVisible();
+    });
+  });
+
   test('grupas: sistēmas administrators pievieno grupu; pasūtītājs to redz, bet nevar mainīt', async ({ browser }) => {
     const g = `E2E grupa ${stamp}`;
     await asUser(browser, USERS.sysadmin.email, async (page) => {

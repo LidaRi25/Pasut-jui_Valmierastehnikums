@@ -176,9 +176,11 @@ as $$
 $$;
 
 -- ---------- Pieteikuma saglabāšana (atomāri) --------------------------------------------------------------------------------------------
--- p_data:  { period_id, course_id, group_id, students, topic, lesson_date, student_count, notes }
+-- p_data:  { period_id, course_id, group_id, students, topic, lesson_date, student_count, notes, expected_updated_at? }
 -- p_items: [ { id?, product_id, unit_id, quantity (teksts vai null), notes } ]  — masīva secība = Npk.
+--          NULL = rindas netiek aiztiktas; masīvs = pilna rindu kopa (trūkstošās rindas tiek dzēstas).
 -- Rindas bez product_id netiek saglabātas (tās paliek tikai lietotāja formā).
+-- expected_updated_at: optimistiskā bloķēšana — ja pieteikums starplaikā mainīts (cits logs / cits lietotājs), tiek atgriezts VT_CONFLICT.
 
 create or replace function public.save_request(p_id uuid, p_data jsonb, p_items jsonb)
 returns jsonb
@@ -192,6 +194,7 @@ declare
   v_item jsonb;
   v_item_id uuid;
   v_ids uuid[] := '{}';
+  v_current timestamptz;
 begin
   if p_data is null or jsonb_typeof(p_data) <> 'object' then
     raise exception 'VT_INVALID';
@@ -216,6 +219,12 @@ begin
     returning * into v_row;
     v_id := v_row.id;
   else
+    if nullif(p_data ->> 'expected_updated_at', '') is not null then
+      select updated_at into v_current from public.requests where id = v_id for update;
+      if found and v_current <> (p_data ->> 'expected_updated_at')::timestamptz then
+        raise exception 'VT_CONFLICT';
+      end if;
+    end if;
     update public.requests set
       period_id = nullif(p_data ->> 'period_id', '')::uuid,
       course_id = nullif(p_data ->> 'course_id', '')::uuid,
@@ -235,34 +244,36 @@ begin
     end if;
   end if;
 
-  for v_item in select * from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) loop
-    if nullif(v_item ->> 'product_id', '') is null then
-      continue;
-    end if;
-    v_pos := v_pos + 1;
-    v_item_id := coalesce(nullif(v_item ->> 'id', '')::uuid, gen_random_uuid());
-    if exists (select 1 from public.request_items where id = v_item_id and request_id = v_id) then
-      update public.request_items set
-        position = v_pos,
-        product_id = (v_item ->> 'product_id')::uuid,
-        quantity = nullif(v_item ->> 'quantity', '')::numeric,
-        unit_id = (v_item ->> 'unit_id')::uuid,
-        notes = nullif(btrim(v_item ->> 'notes'), '')
-      where id = v_item_id;
-    else
-      insert into public.request_items (id, request_id, position, product_id, quantity, unit_id, notes)
-      values (
-        v_item_id, v_id, v_pos,
-        (v_item ->> 'product_id')::uuid,
-        nullif(v_item ->> 'quantity', '')::numeric,
-        (v_item ->> 'unit_id')::uuid,
-        nullif(btrim(v_item ->> 'notes'), '')
-      );
-    end if;
-    v_ids := v_ids || v_item_id;
-  end loop;
+  if p_items is not null then
+    for v_item in select * from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) loop
+      if nullif(v_item ->> 'product_id', '') is null then
+        continue;
+      end if;
+      v_pos := v_pos + 1;
+      v_item_id := coalesce(nullif(v_item ->> 'id', '')::uuid, gen_random_uuid());
+      if exists (select 1 from public.request_items where id = v_item_id and request_id = v_id) then
+        update public.request_items set
+          position = v_pos,
+          product_id = (v_item ->> 'product_id')::uuid,
+          quantity = nullif(v_item ->> 'quantity', '')::numeric,
+          unit_id = (v_item ->> 'unit_id')::uuid,
+          notes = nullif(btrim(v_item ->> 'notes'), '')
+        where id = v_item_id;
+      else
+        insert into public.request_items (id, request_id, position, product_id, quantity, unit_id, notes)
+        values (
+          v_item_id, v_id, v_pos,
+          (v_item ->> 'product_id')::uuid,
+          nullif(v_item ->> 'quantity', '')::numeric,
+          (v_item ->> 'unit_id')::uuid,
+          nullif(btrim(v_item ->> 'notes'), '')
+        );
+      end if;
+      v_ids := v_ids || v_item_id;
+    end loop;
 
-  delete from public.request_items where request_id = v_id and id <> all (v_ids);
+    delete from public.request_items where request_id = v_id and id <> all (v_ids);
+  end if;
 
   select * into v_row from public.requests where id = v_id;
   return jsonb_build_object(

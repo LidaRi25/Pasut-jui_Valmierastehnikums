@@ -8,6 +8,7 @@ import { ConfirmAction } from '@/components/confirm-action';
 import { Icon } from '@/components/icons';
 import { ProductCombobox } from '@/components/product-combobox';
 import { RequestStatusBadge } from '@/components/ui';
+import { formatRequestNo } from '@/lib/format';
 import { parseDecimal, toInputValue } from '@/lib/decimal';
 import type { RequestStatus } from '@/lib/labels';
 import {
@@ -36,6 +37,8 @@ export interface EditorInitial {
   id: string | null;
   requestNo: number | null;
   requestNoLabel: string;
+  /** Pieteikuma pēdējā versija (updated_at) optimistiskajai bloķēšanai; null jaunam pieteikumam */
+  updatedAt: string | null;
   status: RequestStatus;
   teacherName: string;
   header: FormHeader;
@@ -88,6 +91,7 @@ export function RequestEditor({ initial, units, courses, groups, categories, per
   const [version, setVersion] = useState(0);
 
   const idRef = useRef<string | null>(initial.id);
+  const updatedAtRef = useRef<string | null>(initial.updatedAt);
   const stateRef = useRef({ header, items });
   const versionRef = useRef(0);
   const savedVersionRef = useRef(0);
@@ -119,8 +123,13 @@ export function RequestEditor({ initial, units, courses, groups, categories, per
       if (idRef.current && v === savedVersionRef.current) return { ok: true as const };
       setSaveState({ kind: 'saving' });
       const payload = toPayload(h, its);
-      const res = await saveRequestAction({ id: idRef.current, data: payload.data, items: payload.items });
+      const res = await saveRequestAction({
+        id: idRef.current,
+        data: { ...payload.data, expected_updated_at: idRef.current ? updatedAtRef.current : null },
+        items: payload.items,
+      });
       if (res.ok) {
+        updatedAtRef.current = res.updatedAt;
         savedVersionRef.current = Math.max(savedVersionRef.current, v);
         if (!idRef.current) {
           idRef.current = res.id;
@@ -128,7 +137,7 @@ export function RequestEditor({ initial, units, courses, groups, categories, per
           // Adrese kļūst par /pieteikumi/<id> (atsvaidzināšana atver saglabāto melnrakstu). history.replaceState nepārlādē lapu;
           // svarīgi, ka redaktora Server Actions neizsauc revalidatePath — citādi Next pārrenderētu maršrutu un pārmontētu formu.
           window.history.replaceState(null, '', `/pieteikumi/${res.id}`);
-          setRequestNo('P-' + String(res.requestNo).padStart(6, '0'));
+          setRequestNo(formatRequestNo(res.requestNo));
         }
         setSaveState({ kind: 'saved', at: new Date() });
         return { ok: true as const };
@@ -331,9 +340,21 @@ export function RequestEditor({ initial, units, courses, groups, categories, per
       return;
     }
     setSubmitting(true);
-    await queueRef.current;
+    // Vispirms saglabājam (tas izveido melnrakstu un piesaista tā ID), tad iesniedzam pēc ID —
+    // ja iesniegšana neizdodas, atkārtots mēģinājums nerada otru melnrakstu.
+    const saved = await doSave();
+    if (!saved.ok || !idRef.current) {
+      setSubmitting(false);
+      setServerError(saved.ok ? 'Pieteikumu neizdevās saglabāt.' : saved.error);
+      requestAnimationFrame(() => errorSummaryRef.current?.focus());
+      return;
+    }
     const payload = toPayload(header, items);
-    const res = await submitRequestAction({ id: idRef.current, data: payload.data, items: payload.items });
+    const res = await submitRequestAction({
+      id: idRef.current,
+      data: { ...payload.data, expected_updated_at: updatedAtRef.current },
+      items: payload.items,
+    });
     if (!res.ok) {
       setSubmitting(false);
       setServerError(res.error);
@@ -450,7 +471,7 @@ export function RequestEditor({ initial, units, courses, groups, categories, per
               className="input"
               inputMode="numeric"
               pattern="[0-9]*"
-              maxLength={5}
+              maxLength={4}
               value={header.studentCount}
               onChange={(e) => setField('studentCount', e.target.value.replace(/[^\d]/g, ''))}
             />
@@ -566,7 +587,6 @@ export function RequestEditor({ initial, units, courses, groups, categories, per
                       {issues.length ? (
                         <div id={describedBy}>
                           {issues
-                            .filter((i) => i.code !== 'EMPTY_ROW' || true)
                             .map((i) => (
                               <div key={i.code} className={`row-note ${i.severity === 'error' ? 'error' : 'warn'}`}>
                                 {i.message}

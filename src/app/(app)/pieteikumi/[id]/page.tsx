@@ -69,6 +69,7 @@ export default async function RequestPage({
             id: request.id,
             requestNo: request.request_no,
             requestNoLabel: formatRequestNo(request.request_no),
+            updatedAt: request.updated_at,
             status: request.status,
             teacherName,
             header: headerFromRequest(request),

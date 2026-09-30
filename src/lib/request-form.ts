@@ -1,5 +1,5 @@
 // Pieteikuma formas tīrā loģika (bez React): validācija, dublikātu atrašana/apvienošana, datu sagatavošana saglabāšanai.
-import { compareDecimals, isPositive, parseDecimal, sumDecimals } from '@/lib/decimal';
+import { compareDecimals, isPositive, parseDecimal, sumDecimals, toInputValue } from '@/lib/decimal';
 
 export interface FormHeader {
   periodId: string;
@@ -148,7 +148,7 @@ export function validateForm(header: FormHeader, items: FormItem[]): ValidationR
       add({
         severity: 'warning',
         code: 'BIG_QTY',
-        message: `Neparasti liels daudzums (vairāk nekā ${it.unitWarn.replace(/\.?0+$/, '')} ${it.unitCode}) — lūdzu, pārbaudiet.`,
+        message: `Neparasti liels daudzums (vairāk nekā ${toInputValue(it.unitWarn)} ${it.unitCode}) — lūdzu, pārbaudiet.`,
         target: it.key,
         field: 'quantity',
       });
@@ -212,7 +212,7 @@ export function toPayload(header: FormHeader, items: FormItem[]): SavePayload {
       students: header.students.trim(),
       topic: header.topic.trim(),
       lesson_date: header.lessonDate || null,
-      student_count: count !== null && Number.isFinite(count) && count >= 0 ? count : null,
+      student_count: count !== null && Number.isFinite(count) && count >= 0 ? Math.min(count, 10000) : null,
       notes: header.notes.trim(),
     },
     items: items

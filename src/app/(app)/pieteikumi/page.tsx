@@ -50,7 +50,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
     'id, request_no, topic, lesson_date, status, updated_at, teacher_id, profiles(full_name), groups(name), courses(name), order_periods(name, start_date, end_date), items:request_items(count)' +
     (productFilter ? ', pf:request_items!inner(product_id, products!inner(category_id))' : '');
   let q = supabase.from('requests').select(select, { count: 'exact' });
-  if (!admin) q = q.eq('teacher_id', user.id);
+  // Pedagogam RLS atgriež savus pieteikumus + to pedagogu pieteikumus, kuriem administrators piešķīris piekļuvi
   if (filters.period) q = q.eq('period_id', filters.period);
   if (filters.from) q = q.gte('lesson_date', filters.from);
   if (filters.to) q = q.lte('lesson_date', filters.to);
@@ -64,6 +64,8 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
   const from = (page - 1) * PAGE_SIZE;
   const { data, count } = await q.order('updated_at', { ascending: false }).range(from, from + PAGE_SIZE - 1);
   const rows = (data ?? []) as unknown as Row[];
+  // "Pedagogs" kolonna: administratoram vienmēr; pedagogam — ja sarakstā ir arī citu pedagogu (piešķirtā piekļuve) pieteikumi
+  const showTeacher = admin || rows.some((r) => r.teacher_id !== user.id);
 
   const teachers = admin
     ? ((await supabase.from('profiles').select('id, full_name').eq('is_active', true).order('full_name')).data ?? [])
@@ -89,7 +91,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
             <th scope="col">ID</th>
             <th scope="col">Datums</th>
             <th scope="col">Tēma</th>
-            {admin ? <th scope="col">Pedagogs</th> : null}
+            {showTeacher ? <th scope="col">Pedagogs</th> : null}
             <th scope="col">Grupa</th>
             <th scope="col">Periods</th>
             <th scope="col" className="num">
@@ -104,7 +106,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={admin ? 10 : 8}>
+              <td colSpan={(admin ? 1 : 0) + (showTeacher ? 1 : 0) + 8}>
                 <Empty>
                   {hasFilters ? 'Neviens pieteikums neatbilst izvēlētajiem filtriem.' : 'Vēl nav neviena pieteikuma.'}
                   {!admin && !hasFilters ? (
@@ -135,7 +137,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                     {r.topic || <span className="muted">(bez tēmas)</span>}
                   </Link>
                 </td>
-                {admin ? <td data-label="Pedagogs">{r.profiles?.full_name ?? ''}</td> : null}
+                {showTeacher ? <td data-label="Pedagogs">{r.profiles?.full_name ?? ''}</td> : null}
                 <td data-label="Grupa">{[r.courses?.name, r.groups?.name].filter(Boolean).join(', ') || '—'}</td>
                 <td data-label="Periods">{r.order_periods ? periodLabel(r.order_periods) : '—'}</td>
                 <td data-label="Preces" className="num">
@@ -157,7 +159,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                   <a className="btn btn-sm btn-icon" href={`/pieteikumi/${r.id}/druka`} target="_blank" rel="noopener" title="Drukāt" aria-label={`Drukāt pieteikumu ${formatRequestNo(r.request_no)}`}>
                     <Icon name="print" size={16} />
                   </a>
-                  {!admin && r.status === 'draft' ? (
+                  {!admin && r.status === 'draft' && r.teacher_id === user.id ? (
                     <>
                       {' '}
                       <ConfirmAction action={deleteRequestAction} label="Dzēst" hidden={{ id: r.id }} question="Dzēst melnrakstu?" />
